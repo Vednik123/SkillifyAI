@@ -50,6 +50,38 @@ const userSchema = new mongoose.Schema(
       sparse: true,
     },
 
+    // 🔹 STUDENT → multiple faculties
+    faculties: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+    ],
+
+    // 🔹 STUDENT → multiple parents
+    parents: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+    ],
+
+    // 🔹 FACULTY → multiple students
+    students: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+    ],
+
+    // 🔹 PARENT → multiple students
+    children: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+    ],
+
     // 🔹 STUDENT-ONLY FIELDS
     educationLevel: {
       type: String,
@@ -83,4 +115,5 @@ const userSchema = new mongoose.Schema(
 );
 
 const User = mongoose.model("User", userSchema);
+
 export default User;

@@ -7,6 +7,12 @@ import authRoutes from "./routes/authRoutes.js";
 import studentRoutes from "./routes/studentRoutes.js";
 import facultyRoutes from "./routes/facultyRoutes.js";
 import parentRoutes from "./routes/parentRoutes.js";
+import notificationRoutes from "./routes/notificationRoutes.js";
+import aiMentorRoutes from "./routes/aiMentorRoutes.js";
+import aiTutorRoutes from "./routes/aiTutorRoutes.js";
+import aiRoutes from "./routes/aiRoutes.js";
+
+
 
 dotenv.config();
 connectDB();
@@ -35,10 +41,19 @@ app.get("/", (req, res) => {
   });
 });
 
+app.use("/uploads", express.static("uploads"));
+
 app.use("/api/auth", authRoutes);
 app.use("/api/student", studentRoutes);
 app.use("/api/faculty", facultyRoutes);
 app.use("/api/parent", parentRoutes);
+app.use("/api", aiRoutes);
+
+
+app.use("/api/ai-mentor", aiMentorRoutes);
+app.use("/api/notifications", notificationRoutes);
+app.use("/api/ai-tutor", aiTutorRoutes);
+
 
 // ✅ Server start
 const PORT = process.env.PORT;

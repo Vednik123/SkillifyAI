@@ -1,6 +1,11 @@
 import express from "express";
 import { protect } from "../middlewares/authMiddleware.js";
 import { authorizeRoles } from "../middlewares/roleMiddleware.js";
+import {
+  getStudentMaterials,
+  downloadStudentMaterial,
+} from "../controllers/studentMaterial.js";
+
 
 const router = express.Router();
 
@@ -31,9 +36,6 @@ router.put(
   }
 );
 
-export default router;
-
-
 router.post(
   "/face-register",
   protect,
@@ -57,4 +59,34 @@ router.post(
     res.json({ success: true });
   }
 );
+
+/*
+========================
+GET MATERIALS
+========================
+*/
+router.get(
+  "/materials",
+  protect,
+  authorizeRoles("student"),
+  getStudentMaterials
+);
+
+/*
+========================
+DOWNLOAD MATERIAL
+========================
+*/
+router.get(
+  "/materials/download/:id",
+  protect,
+  authorizeRoles("student"),
+  downloadStudentMaterial
+);
+
+
+
+export default router;
+
+
 

@@ -6,6 +6,7 @@ import User from "../models/User.js";
 import generateToken from "../utils/generateToken.js";
 import { generateRoleId } from "../utils/generateUserId.js";
 
+
 export const registerUser = async (req, res) => {
   try {
     const {
@@ -103,5 +104,51 @@ export const loginUser = async (req, res) => {
 
   } catch (error) {
     res.status(500).json({ message: "Server error" });
+  }
+};
+
+/*
+============================
+GET PROFILE
+============================
+*/
+export const getProfile = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id).select("-password");
+    res.json(user);
+  } catch (error) {
+    res.status(500).json({ message: "Failed to fetch profile" });
+  }
+};
+
+/*
+============================
+UPDATE PROFILE
+============================
+*/
+export const updateProfile = async (req, res) => {
+  try {
+    const { fullName, email, phone, educationLevel } = req.body;
+
+    const user = await User.findById(req.user._id);
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    user.fullName = fullName || user.fullName;
+    user.email = email || user.email;
+    user.phone = phone || user.phone;
+
+    if (user.role === "student") {
+      user.educationLevel =
+        educationLevel || user.educationLevel;
+    }
+
+    await user.save();
+
+    res.json({ message: "Profile updated successfully" });
+  } catch (error) {
+    res.status(500).json({ message: "Failed to update profile" });
   }
 };
