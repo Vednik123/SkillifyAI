@@ -221,23 +221,6 @@ export const evaluateInterviewSession = async (req, res) => {
 
     const gemini = getGeminiModel();
 
-    evaluation.questions.forEach((q, i) => {
-      if (
-        session.questions[i].userAnswer &&
-        session.questions[i].userAnswer.trim() !== ""
-      ) {
-        // 🔥 Normalize score
-        let normalizedScore = q.score;
-
-        if (normalizedScore <= 1) {
-          normalizedScore = normalizedScore * 10;
-        }
-
-        session.questions[i].feedback = q.feedback;
-        session.questions[i].score = Math.min(10, normalizedScore);
-      }
-    });
-
     const prompt = `
 You are a professional interview evaluator.
 
@@ -280,8 +263,15 @@ ${JSON.stringify(session.questions)}
         session.questions[i].userAnswer &&
         session.questions[i].userAnswer.trim() !== ""
       ) {
+        // 🔥 Normalize score
+        let normalizedScore = q.score;
+
+        if (normalizedScore <= 1) {
+          normalizedScore = normalizedScore * 10;
+        }
+
         session.questions[i].feedback = q.feedback;
-        session.questions[i].score = q.score;
+        session.questions[i].score = Math.min(10, normalizedScore);
       }
     });
 

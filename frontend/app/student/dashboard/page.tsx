@@ -1,9 +1,9 @@
-'use client'
+"use client";
 
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
-import { Card } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import {
   LineChart,
   Line,
@@ -16,70 +16,67 @@ import {
   Pie,
   Cell,
   Legend,
-} from 'recharts'
-import { Target, Award, Clock, Flame, TrendingUp } from 'lucide-react'
+  BarChart,
+  Bar,
+} from "recharts";
+import {
+  Target,
+  Flame,
+  TrendingUp,
+  MessageSquare,
+  Mic,
+  Brain,
+  ClipboardList,
+} from "lucide-react";
 
 export default function StudentDashboard() {
-  const router = useRouter()
-  const [loading, setLoading] = useState(true)
-
-  const [dashboardData, setDashboardData] = useState({
-    totalExams: 0,
-    avgScore: 0,
-    passRate: 0,
-    recentExams: [] as any[],
-    subjectPerformance: [] as any[],
-    studyHours: 0,
-    certificates: 0,
-    streak: 0,
-  })
+  const router = useRouter();
+  const [loading, setLoading] = useState(true);
+  const [dashboardData, setDashboardData] = useState<any>(null);
 
   const token =
-    typeof window !== 'undefined' ? localStorage.getItem('token') || '' : ''
+    typeof window !== "undefined" ? localStorage.getItem("token") || "" : "";
 
-  const COLORS = ['#7C3AED', '#06B6D4', '#10B981', '#F59E0B']
+  const COLORS = ["#7C3AED", "#06B6D4", "#10B981", "#F59E0B", "#EF4444"];
 
-  /* ================= FETCH ================= */
   useEffect(() => {
     if (!token) {
-      router.push('/login')
-      return
+      router.push("/login");
+      return;
     }
 
     const fetchDashboardData = async () => {
       try {
-        const res = await fetch('http://localhost:5000/api/student/dashboard', {
+        const res = await fetch("http://localhost:5000/api/student/dashboard", {
           headers: { Authorization: `Bearer ${token}` },
-        })
+        });
 
-        const data = await res.json()
-        setDashboardData({
-          totalExams: data.totalExams || 0,
-          avgScore: data.avgScore || 0,
-          passRate: data.passRate || 0,
-          recentExams: data.recentExams || [],
-          subjectPerformance: data.subjectPerformance || [],
-          studyHours: data.studyHours || 0,
-          certificates: data.certificates || 0,
-          streak: data.streak || 0,
-        })
+        const data = await res.json();
+        console.log("DASHBOARD DATA:", data); // 🔥 DEBUG
+        setDashboardData(data);
       } catch (err) {
-        console.error('Student dashboard fetch failed:', err)
+        console.error("Dashboard fetch failed:", err);
       } finally {
-        setLoading(false)
+        setLoading(false);
       }
-    }
+    };
 
-    fetchDashboardData()
-  }, [token, router])
+    fetchDashboardData();
+  }, [token, router]);
 
-  if (loading) {
+  if (loading || !dashboardData) {
     return (
       <div className="p-8 text-center text-muted-foreground">
         Loading dashboard...
       </div>
-    )
+    );
   }
+
+  const performanceDistribution = [
+    { name: "Quiz", value: dashboardData.avgQuizScore || 0 },
+    { name: "Interview", value: dashboardData.avgInterviewScore || 0 },
+    { name: "Oral", value: dashboardData.avgOralScore || 0 },
+  ];
 
   return (
     <div className="p-8 space-y-8">
@@ -87,66 +84,77 @@ export default function StudentDashboard() {
       <div>
         <h1 className="text-3xl font-bold">Student Dashboard</h1>
         <p className="text-muted-foreground mt-2">
-          Track your learning progress and growth
+          Complete AI Performance Analytics
         </p>
       </div>
 
-      {/* KPI CARDS */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+      {/* KPI SECTION */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
         <Card className="p-6 flex items-center gap-4">
-          <Target className="text-blue-600" />
+          <Brain className="text-purple-600" />
           <div>
-            <p className="text-sm text-muted-foreground">Avg Score</p>
-            <p className="text-2xl font-bold">{dashboardData.avgScore}%</p>
+            <p className="text-sm text-muted-foreground">Overall Avg</p>
+            <p className="text-2xl font-bold">
+              {dashboardData.overallAverage || 0}%
+            </p>
           </div>
         </Card>
 
         <Card className="p-6 flex items-center gap-4">
-          <Award className="text-green-600" />
+          <ClipboardList className="text-blue-600" />
           <div>
-            <p className="text-sm text-muted-foreground">Tests Completed</p>
-            <p className="text-2xl font-bold">{dashboardData.totalExams}</p>
+            <p className="text-sm text-muted-foreground">Exam Attempts</p>
+            <p className="text-2xl font-bold">
+              {dashboardData.totalQuizzes || 0}
+            </p>
           </div>
         </Card>
 
         <Card className="p-6 flex items-center gap-4">
-          <Clock className="text-yellow-600" />
+          <MessageSquare className="text-green-600" />
           <div>
-            <p className="text-sm text-muted-foreground">Study Hours</p>
-            <p className="text-2xl font-bold">{dashboardData.studyHours}</p>
+            <p className="text-sm text-muted-foreground">Interviews</p>
+            <p className="text-2xl font-bold">
+              {dashboardData.totalInterviews || 0}
+            </p>
           </div>
         </Card>
 
         <Card className="p-6 flex items-center gap-4">
-          <TrendingUp className="text-purple-600" />
+          <Mic className="text-yellow-600" />
+          <div>
+            <p className="text-sm text-muted-foreground">Faculty Orals</p>
+            <p className="text-2xl font-bold">
+              {dashboardData.totalOrals || 0}
+            </p>
+          </div>
+        </Card>
+
+        <Card className="p-6 flex items-center gap-4">
+          <TrendingUp className="text-indigo-600" />
           <div>
             <p className="text-sm text-muted-foreground">Pass Rate</p>
-            <p className="text-2xl font-bold">{dashboardData.passRate}%</p>
+            <p className="text-2xl font-bold">{dashboardData.passRate || 0}%</p>
           </div>
         </Card>
 
         <Card className="p-6 flex items-center gap-4">
           <Flame className="text-red-600" />
           <div>
-            <p className="text-sm text-muted-foreground">Day Streak</p>
-            <p className="text-2xl font-bold">{dashboardData.streak}</p>
+            <p className="text-sm text-muted-foreground">Streak</p>
+            <p className="text-2xl font-bold">
+              {dashboardData.streak || 0} days
+            </p>
           </div>
         </Card>
       </div>
 
-      {/* CHARTS */}
+      {/* TREND CHARTS */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* PERFORMANCE TREND */}
-        <Card className="lg:col-span-2 p-6">
-          <h2 className="font-semibold mb-4">Performance Trend</h2>
-
-          <ResponsiveContainer width="100%" height={300}>
-            <LineChart
-              data={dashboardData.recentExams.map((exam, index) => ({
-                attempt: index + 1,
-                score: exam.score || 0,
-              }))}
-            >
+        <Card className="p-6">
+          <h2 className="font-semibold mb-4">Exam Trend</h2>
+          <ResponsiveContainer width="100%" height={250}>
+            <LineChart data={dashboardData.quizTrend || []}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="attempt" />
               <YAxis domain={[0, 100]} />
@@ -161,27 +169,74 @@ export default function StudentDashboard() {
           </ResponsiveContainer>
         </Card>
 
-        {/* SUBJECT PERFORMANCE */}
+        <Card className="p-6">
+          <h2 className="font-semibold mb-4">Interview Trend</h2>
+          <ResponsiveContainer width="100%" height={250}>
+            <LineChart data={dashboardData.interviewTrend || []}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="attempt" />
+              <YAxis domain={[0, 100]} />
+              <Tooltip />
+              <Line
+                type="monotone"
+                dataKey="score"
+                stroke="#06B6D4"
+                strokeWidth={2}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </Card>
+
+        <Card className="p-6">
+          <h2 className="font-semibold mb-4">Oral Trend</h2>
+          <ResponsiveContainer width="100%" height={250}>
+            <LineChart data={dashboardData.oralTrend || []}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="attempt" />
+              <YAxis domain={[0, 100]} />
+              <Tooltip />
+              <Line
+                type="monotone"
+                dataKey="score"
+                stroke="#10B981"
+                strokeWidth={2}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </Card>
+      </div>
+
+      {/* DISTRIBUTION + SUBJECT */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card className="p-6">
+          <h2 className="font-semibold mb-4">Average Score Distribution</h2>
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart data={performanceDistribution}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="name" />
+              <YAxis domain={[0, 100]} />
+              <Tooltip />
+              <Bar dataKey="value" fill="#7C3AED" />
+            </BarChart>
+          </ResponsiveContainer>
+        </Card>
+
         <Card className="p-6">
           <h2 className="font-semibold mb-4">Subject Performance</h2>
 
-          {dashboardData.subjectPerformance.length === 0 ? (
-            <p className="text-center text-muted-foreground py-10">
-              No subject data available
-            </p>
-          ) : (
-            <ResponsiveContainer width="100%" height={280}>
+          {dashboardData.subjectPerformance?.length > 0 ? (
+            <ResponsiveContainer width="100%" height={300}>
               <PieChart>
                 <Pie
                   data={dashboardData.subjectPerformance}
                   dataKey="score"
                   nameKey="subject"
-                  innerRadius={40}
-                  outerRadius={80}
+                  innerRadius={50}
+                  outerRadius={90}
                   paddingAngle={3}
                   label
                 >
-                  {dashboardData.subjectPerformance.map((_, i) => (
+                  {dashboardData.subjectPerformance.map((_: any, i: number) => (
                     <Cell key={i} fill={COLORS[i % COLORS.length]} />
                   ))}
                 </Pie>
@@ -189,6 +244,10 @@ export default function StudentDashboard() {
                 <Legend />
               </PieChart>
             </ResponsiveContainer>
+          ) : (
+            <p className="text-center text-muted-foreground py-10">
+              No subject data available
+            </p>
           )}
         </Card>
       </div>
@@ -197,57 +256,47 @@ export default function StudentDashboard() {
       <Card className="p-6">
         <h2 className="font-semibold mb-4">Recent Activity</h2>
 
-        {dashboardData.recentExams.length === 0 ? (
+        {(dashboardData.recentActivity || []).length === 0 ? (
           <p className="text-center text-muted-foreground py-6">
-            No exams attempted yet
+            No recent activity
           </p>
         ) : (
           <div className="space-y-4">
-            {dashboardData.recentExams.slice(0, 5).map((exam, index) => (
-              <div
-                key={index}
-                className="flex justify-between items-center border-b pb-3"
-              >
-                <div>
-                  <p className="font-medium">{exam.subject}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {exam.title} • Score {exam.score}%
-                  </p>
-                </div>
+            {dashboardData.recentActivity
+              .slice(0, 6)
+              .map((item: any, index: number) => (
+                <div key={index} className="flex justify-between border-b pb-3">
+                  <div>
+                    <p className="font-medium">
+                      {item.type} • {item.subject}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {item.title}
+                    </p>
+                  </div>
 
-                <span
-                  className={`px-3 py-1 rounded text-sm ${
-                    exam.score >= 40
-                      ? 'bg-green-100 text-green-800'
-                      : 'bg-red-100 text-red-800'
-                  }`}
-                >
-                  {exam.score >= 40 ? 'Passed' : 'Failed'}
-                </span>
-              </div>
-            ))}
+                  <span className="font-semibold">{item.score || 0}%</span>
+                </div>
+              ))}
           </div>
         )}
       </Card>
 
-      {/* ACTIONS */}
+      {/* ACTION BUTTONS */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Button onClick={() => router.push('/student/quiz/scheduled')}>
-          View Exams
+        <Button onClick={() => router.push("/student/quiz")}>
+          Practice Exams
         </Button>
         <Button
           variant="outline"
-          onClick={() => router.push('/student/materials')}
+          onClick={() => router.push("/student/interview")}
         >
-          Browse Materials
+          Practice Interviews
         </Button>
-        <Button
-          variant="outline"
-          onClick={() => router.push('/student/ai-tutor')}
-        >
-          AI Tutor
+        <Button variant="outline" onClick={() => router.push("/student/oral")}>
+          Faculty Orals
         </Button>
       </div>
     </div>
-  )
+  );
 }
