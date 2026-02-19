@@ -1,208 +1,305 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts'
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+} from 'recharts'
 import { TrendingUp, BookOpen, Target, AlertCircle } from 'lucide-react'
+
+const COLORS = [
+  '#7C3AED',
+  '#3B82F6',
+  '#10B981',
+  '#F59E0B',
+  '#EF4444',
+  '#EC4899',
+  '#22C55E',
+]
 
 export default function ParentDashboard() {
   const router = useRouter()
-  const [showDetailsModal, setShowDetailsModal] = useState(false)
+
+  const [children, setChildren] = useState<any[]>([])
+  const [childrenProgress, setChildrenProgress] = useState<Record<string, any>>({})
   const [selectedChild, setSelectedChild] = useState<any>(null)
-  const handleViewDetails = (child: any) => {
+  const [showDetailsModal, setShowDetailsModal] = useState(false)
+  const [loading, setLoading] = useState(true)
+
+  const token =
+    typeof window !== 'undefined' ? localStorage.getItem('token') || '' : ''
+
+  /* ================= FETCH DATA ================= */
+  useEffect(() => {
+    if (!token) {
+      router.push('/login')
+      return
+    }
+
+    const fetchDashboard = async () => {
+      try {
+        const res = await fetch(
+          'http://localhost:5000/api/parent/dashboard',
+          { headers: { Authorization: `Bearer ${token}` } }
+        )
+        const childrenData = await res.json()
+        setChildren(childrenData)
+
+        const progressResults = await Promise.all(
+          childrenData.map(async (child: any) => {
+            try {
+              const r = await fetch(
+                `http://localhost:5000/api/parent/child-progress/${child._id}`,
+                { headers: { Authorization: `Bearer ${token}` } }
+              )
+              const p = await r.json()
+              return { childId: child._id, progress: p }
+            } catch {
+              return { childId: child._id, progress: null }
+            }
+          })
+        )
+
+        const map: Record<string, any> = {}
+        progressResults.forEach((r) => {
+          map[r.childId] = r.progress
+        })
+
+        setChildrenProgress(map)
+      } catch (err) {
+        console.error('Dashboard fetch error', err)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchDashboard()
+  }, [token, router])
+
+  /* ================= STATS ================= */
+  const stats = useMemo(() => {
+    let totalQuizzes = 0
+    let totalScore = 0
+    let attentionNeeded = 0
+
+    children.forEach((child) => {
+      const p = childrenProgress[child._id]?.child
+      if (!p) return
+
+      totalQuizzes += p.totalExams || 0
+      totalScore += p.averageScore || 0
+
+      if (p.averageScore < 60) attentionNeeded++
+    })
+
+    const avgScore =
+      children.length > 0 ? Math.round(totalScore / children.length) : 0
+
+    return {
+      totalQuizzes,
+      avgScore,
+      attentionNeeded,
+    }
+  }, [children, childrenProgress])
+
+  /* ================= LINE CHART ================= */
+const progressData = useMemo(() => {
+  /**
+   * Structure:
+   * {
+   *   Jan: { month: 'Jan', Rahul: 70, Anaya: 82 },
+   *   Feb: { month: 'Feb', Rahul: 75, Anaya: 85 }
+   * }
+   */
+  const monthlyMap: Record<
+    string,
+    { month: string; [childName: string]: number }
+  > = {}
+
+  children.forEach((child) => {
+    const progress = childrenProgress[child._id]
+    if (!progress?.recentAttempts) return
+
+    // group attempts by month for THIS child
+    const byMonth: Record<string, number[]> = {}
+
+    progress.recentAttempts.forEach((a: any) => {
+      const month = new Date(a.submittedAt).toLocaleDateString('en', {
+        month: 'short',
+      })
+
+      if (!byMonth[month]) byMonth[month] = []
+      byMonth[month].push(a.score || 0)
+    })
+
+    // calculate monthly average
+    Object.entries(byMonth).forEach(([month, scores]) => {
+      const avg =
+        scores.reduce((sum, s) => sum + s, 0) / scores.length
+
+      if (!monthlyMap[month]) {
+        monthlyMap[month] = { month }
+      }
+
+      monthlyMap[month][child.fullName] = Math.round(avg)
+    })
+  })
+
+  // sort months in calendar order
+  const monthOrder = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+
+  return Object.values(monthlyMap).sort(
+    (a, b) =>
+      monthOrder.indexOf(a.month) - monthOrder.indexOf(b.month)
+  )
+}, [children, childrenProgress])
+
+  /* ================= BAR CHART ================= */
+  const activityData = useMemo(() => {
+    return children.map((child) => ({
+      name: child.fullName,
+      quizzes: childrenProgress[child._id]?.child?.totalExams || 0,
+    }))
+  }, [children, childrenProgress])
+
+  /* ================= HANDLERS ================= */
+  const openDetails = (child: any) => {
     setSelectedChild(child)
     setShowDetailsModal(true)
   }
 
-  const handleGoToProgress = (childName: string) => {
-    router.push(`/parent/progress?child=${encodeURIComponent(childName)}`)
+  const goToProgress = (childId: string) => {
+    router.push(`/parent/progress?child=${childId}`)
     setShowDetailsModal(false)
   }
 
-  const children = [
-    { id: 1, name: 'Emma Johnson', grade: '10th Grade', avgScore: 85 },
-    { id: 2, name: 'Liam Johnson', grade: '8th Grade', avgScore: 78 },
-  ]
+  if (loading) {
+    return <div className="p-6 text-center">Loading dashboard…</div>
+  }
 
-  const progressData = [
-    { month: 'Jan', Emma: 75, Liam: 68 },
-    { month: 'Feb', Emma: 78, Liam: 72 },
-    { month: 'Mar', Emma: 82, Liam: 75 },
-    { month: 'Apr', Emma: 85, Liam: 78 },
-  ]
-
-  const activityData = [
-    { name: 'Quizzes', value: 45 },
-    { name: 'Materials', value: 32 },
-    { name: 'Certifications', value: 8 },
-  ]
-
+  /* ================= UI ================= */
   return (
     <div className="space-y-6 p-6">
-      <div>
-        <h1 className="text-3xl font-bold text-foreground">Parent Dashboard</h1>
-        <p className="text-muted-foreground">Monitor your children's learning progress</p>
-      </div>
+      <h1 className="text-3xl font-bold">Parent Dashboard</h1>
 
+      {/* ===== STATS ===== */}
       <div className="grid gap-4 md:grid-cols-4">
-        <Card className="p-6">
-          <div className="flex items-center gap-4">
-            <div className="rounded-lg bg-blue-100 p-3">
-              <TrendingUp className="h-6 w-6 text-blue-600" />
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Average Score</p>
-              <p className="text-2xl font-bold">82.5%</p>
-            </div>
-          </div>
-        </Card>
-
-        <Card className="p-6">
-          <div className="flex items-center gap-4">
-            <div className="rounded-lg bg-green-100 p-3">
-              <BookOpen className="h-6 w-6 text-green-600" />
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Quizzes Taken</p>
-              <p className="text-2xl font-bold">24</p>
-            </div>
-          </div>
-        </Card>
-
-        <Card className="p-6">
-          <div className="flex items-center gap-4">
-            <div className="rounded-lg bg-purple-100 p-3">
-              <Target className="h-6 w-6 text-purple-600" />
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Certifications</p>
-              <p className="text-2xl font-bold">3</p>
-            </div>
-          </div>
-        </Card>
-
-        <Card className="p-6">
-          <div className="flex items-center gap-4">
-            <div className="rounded-lg bg-orange-100 p-3">
-              <AlertCircle className="h-6 w-6 text-orange-600" />
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Attention Needed</p>
-              <p className="text-2xl font-bold">1</p>
-            </div>
-          </div>
-        </Card>
+        <Stat icon={<TrendingUp />} label="Average Score" value={`${stats.avgScore}%`} />
+        <Stat icon={<BookOpen />} label="Total Quizzes" value={stats.totalQuizzes} />
+        <Stat icon={<Target />} label="Children" value={children.length} />
+        <Stat icon={<AlertCircle />} label="Attention Needed" value={stats.attentionNeeded} />
       </div>
 
+      {/* ===== CHARTS ===== */}
       <div className="grid gap-6 lg:grid-cols-3">
         <Card className="lg:col-span-2 p-6">
-          <h2 className="mb-4 font-semibold text-foreground">Progress Over Time</h2>
-          <ResponsiveContainer width="100%" height={300}>
+          <h2 className="mb-4 font-semibold">Progress Over Time</h2>
+          <ResponsiveContainer width="100%" height={320}>
             <LineChart data={progressData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+              <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="month" />
               <YAxis />
               <Tooltip />
-              <Line type="monotone" dataKey="Emma" stroke="#7C3AED" strokeWidth={2} />
-              <Line type="monotone" dataKey="Liam" stroke="#3B82F6" strokeWidth={2} />
+              {children.map((child, i) => (
+                <Line
+                  key={child._id}
+                  dataKey={child.fullName}
+                  stroke={COLORS[i % COLORS.length]}
+                  strokeWidth={2}
+                />
+              ))}
             </LineChart>
           </ResponsiveContainer>
         </Card>
 
         <Card className="p-6">
-          <h2 className="mb-4 font-semibold text-foreground">Learning Activity</h2>
-          <ResponsiveContainer width="100%" height={300}>
+          <h2 className="mb-4 font-semibold">Child Activity</h2>
+          <ResponsiveContainer width="100%" height={320}>
             <BarChart data={activityData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
               <XAxis dataKey="name" />
               <YAxis />
               <Tooltip />
-              <Bar dataKey="value" fill="#7C3AED" />
+              <Bar dataKey="quizzes" fill="#7C3AED" />
             </BarChart>
           </ResponsiveContainer>
         </Card>
       </div>
 
+      {/* ===== CHILD LIST ===== */}
       <Card className="p-6">
-        <h2 className="mb-4 font-semibold text-foreground">Your Children</h2>
-        <div className="space-y-3">
-          {children.map((child) => (
-            <div key={child.id} className="flex items-center justify-between rounded-lg border border-border p-4">
-              <div>
-                <p className="font-medium text-foreground">{child.name}</p>
-                <p className="text-sm text-muted-foreground">{child.grade}</p>
-              </div>
-              <div className="flex items-center gap-4">
-                <div className="text-right">
-                  <p className="text-lg font-semibold text-foreground">{child.avgScore}%</p>
-                  <p className="text-xs text-muted-foreground">Average Score</p>
-                </div>
-                <Button 
-                  onClick={() => handleViewDetails(child)}
-                  variant="outline" 
-                  size="sm"
-                >
-                  View Details
-                </Button>
-              </div>
+        <h2 className="mb-4 font-semibold">Your Children</h2>
+        {children.map((child) => (
+          <div
+            key={child._id}
+            className="flex justify-between items-center border rounded p-4 mb-3"
+          >
+            <div>
+              <p className="font-medium">{child.fullName}</p>
+              <p className="text-sm text-muted-foreground">{child.studentId}</p>
             </div>
-          ))}
-        </div>
+            <Button size="sm" variant="outline" onClick={() => openDetails(child)}>
+              View Details
+            </Button>
+          </div>
+        ))}
       </Card>
 
-      {/* Details Modal */}
+      {/* ===== MODAL ===== */}
       {showDetailsModal && selectedChild && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <Card className="w-full max-w-md p-8 border border-border">
-            <div className="space-y-6">
-              <div className="flex justify-between items-center">
-                <h2 className="text-2xl font-bold text-foreground">{selectedChild.name}</h2>
-                <button 
-                  onClick={() => setShowDetailsModal(false)}
-                  className="text-2xl text-muted-foreground hover:text-foreground"
-                >
-                  ×
-                </button>
-              </div>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <Card className="p-6 w-full max-w-md">
+            <h2 className="text-xl font-bold mb-4">
+              {selectedChild.fullName}
+            </h2>
 
-              <div className="grid grid-cols-2 gap-4 p-4 bg-secondary rounded-lg">
-                <div>
-                  <p className="text-xs text-muted-foreground">Grade</p>
-                  <p className="font-semibold text-foreground">{selectedChild.grade}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Average Score</p>
-                  <p className="font-semibold text-foreground">{selectedChild.avgScore}%</p>
-                </div>
-              </div>
+            <p>
+              Average Score:{' '}
+              <strong>
+                {childrenProgress[selectedChild._id]?.child?.averageScore || 0}%
+              </strong>
+            </p>
 
-              <div className="space-y-2 text-sm text-muted-foreground">
-                <p>Recent Activity: Active in 5 quizzes this week</p>
-                <p>Progress: Improving in Mathematics</p>
-                <p>Status: On Track</p>
-              </div>
-
-              <div className="flex gap-3 pt-4">
-                <Button 
-                  onClick={() => handleGoToProgress(selectedChild.name)}
-                  className="flex-1 bg-primary hover:bg-primary/90"
-                >
-                  View Full Progress
-                </Button>
-                <Button 
-                  onClick={() => setShowDetailsModal(false)}
-                  variant="outline" 
-                  className="flex-1"
-                >
-                  Close
-                </Button>
-              </div>
+            <div className="flex gap-3 mt-6">
+              <Button
+                className="flex-1"
+                onClick={() => goToProgress(selectedChild._id)}
+              >
+                View Full Progress
+              </Button>
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => setShowDetailsModal(false)}
+              >
+                Close
+              </Button>
             </div>
           </Card>
         </div>
       )}
     </div>
+  )
+}
+
+/* ===== SMALL STAT CARD ===== */
+function Stat({ icon, label, value }: any) {
+  return (
+    <Card className="p-6 flex items-center gap-4">
+      <div className="p-3 bg-muted rounded">{icon}</div>
+      <div>
+        <p className="text-sm text-muted-foreground">{label}</p>
+        <p className="text-2xl font-bold">{value}</p>
+      </div>
+    </Card>
   )
 }

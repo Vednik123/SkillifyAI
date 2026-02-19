@@ -1,348 +1,461 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import Link from 'next/link'
+import { useEffect, useRef, useState, useCallback } from 'react'
+import { useRouter, useParams } from 'next/navigation'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogTitle } from '@/components/ui/alert-dialog'
-import { Camera, Clock, AlertTriangle, CheckCircle, Volume2 } from 'lucide-react'
+import { Clock } from 'lucide-react'
+import * as faceapi from 'face-api.js'
+import { loadFaceModels } from '@/lib/faceApi'
 
-const quizQuestions = [
-  {
-    id: 1,
-    question: 'What is the derivative of x² + 3x + 5?',
-    options: ['2x + 3', '2x + 5', 'x + 3', '2x'],
-    correct: 0,
-  },
-  {
-    id: 2,
-    question: 'Which of the following is a prime number?',
-    options: ['15', '21', '17', '20'],
-    correct: 2,
-  },
-  {
-    id: 3,
-    question: 'Solve: 3x + 7 = 22',
-    options: ['x = 5', 'x = 3', 'x = 6', 'x = 4'],
-    correct: 0,
-  },
-  {
-    id: 4,
-    question: 'What is the area of a circle with radius 5?',
-    options: ['25π', '10π', 'πr²', '15π'],
-    correct: 0,
-  },
-  {
-    id: 5,
-    question: 'Simplify: (x + 2)² - (x - 2)²',
-    options: ['4x', '8x', '0', '16'],
-    correct: 1,
-  },
-]
+/* ================= CAMERA ================= */
 
-export default function QuizTakePage({ params }: { params: { id: string } }) {
-  const [currentQuestion, setCurrentQuestion] = useState(0)
-  const [selectedAnswers, setSelectedAnswers] = useState<(number | null)[]>(Array(quizQuestions.length).fill(null))
-  const [timeLeft, setTimeLeft] = useState(60 * 60) // 1 hour in seconds
-  const [tabSwitchWarnings, setTabSwitchWarnings] = useState(0)
-  const [cameraActive, setCameraActive] = useState(true)
-  const [showTabWarning, setShowTabWarning] = useState(false)
-  const [showSubmitDialog, setShowSubmitDialog] = useState(false)
-  const [quizSubmitted, setQuizSubmitted] = useState(false)
+function CameraPreview({
+  active,
+  onFrame,
+}: {
+  active: boolean
+  onFrame: (payload: { embedding: number[] }) => void
+}) {
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const streamRef = useRef<MediaStream | null>(null)
+  const intervalRef = useRef<NodeJS.Timeout | null>(null)
 
-  // Timer
   useEffect(() => {
-    const interval = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 0) {
-          handleSubmitQuiz()
-          return 0
-        }
-        return prev - 1
-      })
-    }, 1000)
-    return () => clearInterval(interval)
-  }, [])
+    if (!active) return
+    let stopped = false
 
-  // Tab switch detection
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.hidden) {
-        const newWarnings = tabSwitchWarnings + 1
-        setTabSwitchWarnings(newWarnings)
-        setShowTabWarning(true)
-        setTimeout(() => setShowTabWarning(false), 3000)
+    const start = async () => {
+      try {
+        await loadFaceModels()
 
-        if (newWarnings > 2) {
-          alert('You have switched tabs more than 2 times. Your quiz will be submitted automatically.')
-          handleSubmitQuiz()
-        }
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { width: 320, height: 240, facingMode: 'user' },
+          audio: false,
+        })
+
+        if (stopped) return
+        streamRef.current = stream
+        if (videoRef.current) videoRef.current.srcObject = stream
+
+        intervalRef.current = setInterval(async () => {
+          if (!videoRef.current || stopped) return
+
+          const detection = await faceapi
+            .detectSingleFace(videoRef.current)
+            .withFaceLandmarks()
+            .withFaceDescriptor()
+
+          onFrame({
+            embedding: detection ? Array.from(detection.descriptor) : [],
+          })
+        }, 4000)
+      } catch {
+        alert('Camera permission required')
       }
     }
 
-    document.addEventListener('visibilitychange', handleVisibilityChange)
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
-  }, [tabSwitchWarnings])
+    start()
 
-  const formatTime = (seconds: number) => {
-    const hours = Math.floor(seconds / 3600)
-    const minutes = Math.floor((seconds % 3600) / 60)
-    const secs = seconds % 60
-    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
-  }
-
-  const handleAnswerSelect = (optionIndex: number) => {
-    const newAnswers = [...selectedAnswers]
-    newAnswers[currentQuestion] = optionIndex
-    setSelectedAnswers(newAnswers)
-  }
-
-  const handleSubmitQuiz = () => {
-    setQuizSubmitted(true)
-  }
-
-  const handleNext = () => {
-    if (currentQuestion < quizQuestions.length - 1) {
-      setCurrentQuestion(currentQuestion + 1)
+    return () => {
+      stopped = true
+      intervalRef.current && clearInterval(intervalRef.current)
+      streamRef.current?.getTracks().forEach(t => t.stop())
+      if (videoRef.current) videoRef.current.srcObject = null
     }
-  }
-
-  const handlePrevious = () => {
-    if (currentQuestion > 0) {
-      setCurrentQuestion(currentQuestion - 1)
-    }
-  }
-
-  if (quizSubmitted) {
-    const score = selectedAnswers.filter((answer, idx) => answer === quizQuestions[idx].correct).length
-    const percentage = Math.round((score / quizQuestions.length) * 100)
-
-    return (
-      <div className="h-screen flex flex-col bg-background">
-        <div className="flex-1 flex items-center justify-center p-8">
-          <Card className="max-w-2xl w-full p-12 border border-border text-center space-y-8">
-            <CheckCircle className="w-20 h-20 text-green-600 mx-auto" />
-            <h1 className="text-4xl font-bold text-foreground">Quiz Submitted!</h1>
-            <div className="space-y-4">
-              <p className="text-lg text-muted-foreground">Your quiz has been submitted successfully.</p>
-              <div className="bg-primary/10 rounded-lg p-8">
-                <p className="text-sm text-muted-foreground mb-2">Your Score</p>
-                <p className="text-5xl font-bold text-primary">{percentage}%</p>
-                <p className="text-muted-foreground mt-2">{score} out of {quizQuestions.length} correct</p>
-              </div>
-            </div>
-            <div className="space-y-3">
-              <Link href="/student/quiz/results" className="block">
-                <Button className="w-full bg-primary hover:bg-primary/90 h-11">
-                  View Detailed Results
-                </Button>
-              </Link>
-              <Link href="/student/dashboard" className="block">
-                <Button variant="outline" className="w-full h-11 bg-transparent">
-                  Back to Dashboard
-                </Button>
-              </Link>
-            </div>
-          </Card>
-        </div>
-      </div>
-    )
-  }
-
-  const question = quizQuestions[currentQuestion]
-  const progress = ((currentQuestion + 1) / quizQuestions.length) * 100
+  }, [active])
 
   return (
-    <div className="h-screen flex bg-background overflow-hidden">
-      {/* Main Quiz Area */}
-      <div className="flex-1 flex flex-col">
-        {/* Top Bar */}
-        <div className="border-b border-border bg-card px-8 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-6">
-            <div className="flex items-center gap-2">
-              <Clock className="w-5 h-5 text-primary" />
-              <span className="font-semibold text-lg text-foreground">{formatTime(timeLeft)}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className={`w-3 h-3 rounded-full ${cameraActive ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
-              <span className="text-sm text-muted-foreground">
-                {cameraActive ? 'Camera Active' : 'Camera Off'}
-              </span>
-            </div>
-            <div className="flex items-center gap-2 px-3 py-1 bg-green-100 rounded-full">
-              <CheckCircle className="w-4 h-4 text-green-700" />
-              <span className="text-xs text-green-700 font-semibold">Face Verified</span>
-            </div>
-          </div>
-          <span className="text-sm text-muted-foreground">Question {currentQuestion + 1} of {quizQuestions.length}</span>
-        </div>
-
-        {/* Question Area */}
-        <div className="flex-1 overflow-auto p-8">
-          <div className="max-w-3xl mx-auto space-y-8">
-            {/* Progress */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-foreground">Progress</span>
-                <span className="text-sm text-muted-foreground">{currentQuestion + 1}/{quizQuestions.length}</span>
-              </div>
-              <Progress value={progress} className="h-2" />
-            </div>
-
-            {/* Question Card */}
-            <Card className="p-8 border border-border space-y-8">
-              <h2 className="text-2xl font-semibold text-foreground leading-relaxed">
-                {question.question}
-              </h2>
-
-              {/* Options */}
-              <div className="space-y-3">
-                {question.options.map((option, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => handleAnswerSelect(idx)}
-                    className={`w-full p-4 rounded-lg border-2 transition-all duration-200 text-left font-medium ${
-                      selectedAnswers[currentQuestion] === idx
-                        ? 'border-primary bg-primary/10 text-primary'
-                        : 'border-border bg-card text-foreground hover:border-primary/50'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div
-                        className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
-                          selectedAnswers[currentQuestion] === idx
-                            ? 'border-primary bg-primary'
-                            : 'border-border'
-                        }`}
-                      >
-                        {selectedAnswers[currentQuestion] === idx && (
-                          <div className="w-2 h-2 rounded-full bg-primary-foreground" />
-                        )}
-                      </div>
-                      {option}
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </Card>
-
-            {/* Navigation */}
-            <div className="flex items-center justify-between gap-4">
-              <Button
-                onClick={handlePrevious}
-                disabled={currentQuestion === 0}
-                variant="outline"
-                className="min-w-32 bg-transparent"
-              >
-                Previous
-              </Button>
-
-              <div className="flex gap-2">
-                {quizQuestions.map((_, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => setCurrentQuestion(idx)}
-                    className={`w-10 h-10 rounded-lg font-semibold transition-all ${
-                      idx === currentQuestion
-                        ? 'bg-primary text-primary-foreground'
-                        : selectedAnswers[idx] !== null
-                          ? 'bg-green-100 text-green-700'
-                          : 'bg-secondary text-foreground hover:bg-secondary'
-                    }`}
-                  >
-                    {idx + 1}
-                  </button>
-                ))}
-              </div>
-
-              {currentQuestion === quizQuestions.length - 1 ? (
-                <Button
-                  onClick={() => setShowSubmitDialog(true)}
-                  className="min-w-32 bg-primary hover:bg-primary/90"
-                >
-                  Submit
-                </Button>
-              ) : (
-                <Button
-                  onClick={handleNext}
-                  className="min-w-32 bg-primary hover:bg-primary/90"
-                >
-                  Next
-                </Button>
-              )}
-            </div>
-          </div>
+    <div className="fixed bottom-4 right-4 z-50">
+      <div className="w-44 h-32 border rounded overflow-hidden bg-black">
+        <video ref={videoRef} autoPlay muted playsInline className="w-full h-full object-cover" />
+        <div className="absolute bottom-1 left-1 text-[10px] bg-black/60 text-white px-2 rounded">
+          Camera On
         </div>
       </div>
-
-      {/* Camera Widget */}
-      <div className="w-72 border-l border-border bg-card p-4 flex flex-col gap-4">
-        <h3 className="text-sm font-semibold text-foreground">Camera Feed</h3>
-
-        {/* Camera Preview */}
-        <div className="flex-1 rounded-lg bg-gradient-to-br from-gray-900 to-gray-800 flex items-center justify-center relative overflow-hidden border border-gray-700">
-          {cameraActive ? (
-            <>
-              <div className="w-full h-full bg-gradient-to-br from-gray-800 to-black flex items-center justify-center">
-                <div className="w-32 h-40 rounded-2xl bg-gradient-to-br from-gray-700 to-gray-900 flex items-center justify-center border-2 border-primary/30">
-                  <Camera className="w-12 h-12 text-gray-600" />
-                </div>
-              </div>
-              <div className="absolute top-2 right-2 flex items-center gap-1.5 bg-black/50 px-2 py-1 rounded text-xs text-white">
-                <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-                Live
-              </div>
-            </>
-          ) : (
-            <Camera className="w-12 h-12 text-gray-600" />
-          )}
-        </div>
-
-        {/* Controls */}
-        <Button
-          onClick={() => setCameraActive(!cameraActive)}
-          variant={cameraActive ? 'default' : 'destructive'}
-          size="sm"
-          className="w-full"
-        >
-          {cameraActive ? 'Turn Off Camera' : 'Turn On Camera'}
-        </Button>
-      </div>
-
-      {/* Tab Switch Warning */}
-      {showTabWarning && (
-        <div className="fixed top-4 right-4 bg-red-100 border border-red-300 rounded-lg p-4 max-w-sm animate-in slide-in-from-top">
-          <div className="flex items-start gap-3">
-            <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-            <div>
-              <p className="font-semibold text-red-900">Tab Switch Detected</p>
-              <p className="text-sm text-red-800">Warning {tabSwitchWarnings}/2: Do not switch tabs during the exam</p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Submit Dialog */}
-      <AlertDialog open={showSubmitDialog} onOpenChange={setShowSubmitDialog}>
-        <AlertDialogContent>
-          <AlertDialogTitle>Submit Quiz?</AlertDialogTitle>
-          <div className="space-y-3">
-            <AlertDialogDescription>
-              Are you sure you want to submit the quiz? This action cannot be undone.
-            </AlertDialogDescription>
-            <div className="text-sm text-muted-foreground">
-              You have answered {selectedAnswers.filter((a) => a !== null).length} out of {quizQuestions.length} questions.
-            </div>
-          </div>
-          <div className="flex gap-3 justify-end">
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleSubmitQuiz} className="bg-primary hover:bg-primary/90">
-              Submit Quiz
-            </AlertDialogAction>
-          </div>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   )
+}
+
+/* ================= QUIZ PAGE ================= */
+
+export default function ScheduledQuizTakePage() {
+  const router = useRouter()
+  const { id: examId } = useParams()
+
+  const [questions, setQuestions] = useState<any[]>([])
+  const [currentQuestion, setCurrentQuestion] = useState(0)
+  const [selectedAnswers, setSelectedAnswers] = useState<(number | null)[]>([])
+  const [timeLeft, setTimeLeft] = useState(0)
+  const [attemptId, setAttemptId] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [warningMsg, setWarningMsg] = useState<string | null>(null)
+
+  const answersRef = useRef<any[]>([])
+  const isSubmittingRef = useRef(false)
+  const restoringFullscreenRef = useRef(false)
+  const hasEnteredFullscreenRef = useRef(false)
+  const noFaceCountRef = useRef(0)
+const lastFaceEventRef = useRef(0)
+
+  const totalWarningsRef = useRef(0)
+
+  const token =
+    typeof window !== 'undefined' ? localStorage.getItem('token') || '' : ''
+
+  /* ================= SUBMIT ================= */
+
+  const submit = async (
+    reason: 'NORMAL' | 'TIME_UP' | 'PROCTOR_VIOLATION' = 'NORMAL'
+  ) => {
+    if (!attemptId || isSubmittingRef.current) return
+    isSubmittingRef.current = true
+
+    try {
+      console.log('Submitting scheduled quiz with reason:', reason)
+      console.log('Attempt ID:', attemptId)
+      
+      // For scheduled quizzes, use the exam submission endpoint
+      const res = await fetch(`http://localhost:5000/api/student/exams/attempts/${attemptId}/submit`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          answers: answersRef.current,
+          proctoring: {
+            autoSubmitted: reason === 'PROCTOR_VIOLATION',
+            faceWarnings: totalWarningsRef.current,
+            escWarnings: 0, // We don't track this separately
+            reasons: reason === 'PROCTOR_VIOLATION' ? ['Too many warnings'] : []
+          }
+        }),
+      })
+
+      if (!res.ok) {
+        const errorData = await res.json()
+        console.error('Submit failed:', errorData)
+        throw new Error(errorData.message || 'Submission failed')
+      }
+
+      const data = await res.json()
+      console.log('Submit successful:', data)
+
+      // Exit fullscreen before navigation
+      if (document.fullscreenElement) {
+        try {
+          await document.exitFullscreen()
+        } catch {
+          // ignore
+        }
+      }
+
+      // Navigate to results page
+      router.replace(
+        `/student/quiz/scheduled/results/${attemptId}`
+      )
+    } catch (error) {
+      console.error('Submit error:', error)
+      isSubmittingRef.current = false
+      alert(`Failed to submit quiz:`)
+    }
+  }
+
+  /* ================= WARNING ================= */
+
+  const incrementWarning = (msg: string) => {
+    try {
+      totalWarningsRef.current = Math.min(totalWarningsRef.current + 1, 3)
+      setWarningMsg(msg)
+      setTimeout(() => setWarningMsg(null), 3000)
+
+      // Show warning count to user
+      const warningsLeft = 3 - totalWarningsRef.current
+      if (warningsLeft > 0) {
+        setWarningMsg(`${msg} - ${warningsLeft} more warnings allowed before auto-submit`)
+      }
+
+      if (totalWarningsRef.current >= 3) {
+        // Give user 5 seconds to see final warning before auto-submit
+        setWarningMsg('⚠️ FINAL WARNING: Quiz will auto-submit in 5 seconds...')
+        setTimeout(() => {
+          submit('PROCTOR_VIOLATION')
+        }, 5000)
+      }
+    } catch (error) {
+      console.error('Error incrementing warning:', error)
+    }
+  }
+
+  /* ================= START EXAM ================= */
+
+  useEffect(() => {
+    const start = async () => {
+      const res = await fetch(
+        `http://localhost:5000/api/student/exams/scheduled/${examId}/start`,
+        { method: 'POST', headers: { Authorization: `Bearer ${token}` } }
+      )
+
+      if (!res.ok) {
+        alert('Exam not available')
+        router.replace('/student/quiz/scheduled')
+        return
+      }
+
+      const data = await res.json()
+      setQuestions(data.questions)
+      setSelectedAnswers(new Array(data.questions.length).fill(null))
+      setTimeLeft(data.duration * 60)
+      setAttemptId(data.attemptId)
+
+      answersRef.current = data.questions.map((q: any) => ({
+        questionId: q.questionId,
+        selectedOption: null, // ExamAttempt expects selectedOption, not selectedIndex
+      }))
+
+      setLoading(false)
+    }
+
+    start()
+  }, [])
+
+  /* ================= TIMER ================= */
+
+  useEffect(() => {
+    if (!attemptId) return
+    const timer = setInterval(() => {
+      setTimeLeft(t => {
+        if (t <= 1) {
+          submit('TIME_UP')
+          return 0
+        }
+        return t - 1
+      })
+    }, 1000)
+    return () => clearInterval(timer)
+  }, [attemptId])
+
+  /* ================= ESC ================= */
+
+  useEffect(() => {
+  if (!attemptId) return
+
+  const onFullscreenChange = async () => {
+    if (
+      !document.fullscreenElement &&
+      !isSubmittingRef.current &&
+      !restoringFullscreenRef.current
+    ) {
+      restoringFullscreenRef.current = true
+
+      const res = await fetch(
+        'http://localhost:5000/api/quiz/attempt/warning',
+        {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            attemptId,
+            type: 'TAB',
+            answers: answersRef.current,
+          }),
+        }
+      )
+
+      const data = await res.json()
+      incrementWarning('Fullscreen exit detected (ESC)')
+
+      if (data?.autoSubmitted) {
+        submit('PROCTOR_VIOLATION')
+        return
+      }
+
+      setTimeout(() => {
+        document.documentElement
+          .requestFullscreen()
+          .catch(() => {})
+          .finally(() => {
+            restoringFullscreenRef.current = false
+          })
+      }, 500)
+    }
+  }
+
+  document.addEventListener('fullscreenchange', onFullscreenChange)
+  return () =>
+    document.removeEventListener('fullscreenchange', onFullscreenChange)
+}, [attemptId])
+  /* ================= TAB SWITCH ================= */
+
+ useEffect(() => {
+  if (!attemptId) return
+
+  const onVisibility = async () => {
+    if (document.hidden && !isSubmittingRef.current) {
+      const res = await fetch(
+        'http://localhost:5000/api/quiz/attempt/warning',
+        {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            attemptId,
+            type: 'TAB',
+            answers: answersRef.current,
+          }),
+        }
+      )
+
+      const data = await res.json()
+      incrementWarning('Tab switching detected')
+
+      if (data?.autoSubmitted) {
+        submit('PROCTOR_VIOLATION')
+      }
+    }
+  }
+
+  document.addEventListener('visibilitychange', onVisibility)
+  return () =>
+    document.removeEventListener('visibilitychange', onVisibility)
+}, [attemptId])
+
+/* ================= FACE CHECK ================= */
+
+const onFaceFrame = useCallback(
+  async ({ embedding }: { embedding: number[] }) => {
+    if (!attemptId || isSubmittingRef.current) return
+
+    try {
+      const res = await fetch(
+        'http://localhost:5000/api/proctor/face-check',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            attemptId,
+            embedding,
+            answers: answersRef.current,
+          }),
+        }
+      )
+
+      if (!res.ok) {
+        console.error('Face check failed')
+        return
+      }
+
+      const data = await res.json()
+
+      if (data?.faceMismatch || embedding.length === 0) {
+        incrementWarning('Face not detected / mismatch')
+      }
+
+      if (data?.autoSubmitted) {
+        submit('PROCTOR_VIOLATION')
+      }
+    } catch (error) {
+      console.error('Face check error:', error)
+    }
+  },
+  [attemptId, submit]
+)
+
+/* ================= ANSWERS ================= */
+
+const selectAnswer = (idx: number) => {
+  if (!hasEnteredFullscreenRef.current) {
+    document.documentElement.requestFullscreen?.().catch((error) => {
+      console.error('Error requesting fullscreen:', error)
+    })
+    hasEnteredFullscreenRef.current = true
+  }
+
+  if (currentQuestion < 0 || currentQuestion >= questions.length) {
+    console.error('Invalid question index:', currentQuestion)
+    return
+  }
+
+  const copy = [...selectedAnswers]
+  copy[currentQuestion] = idx
+  setSelectedAnswers(copy)
+
+  if (answersRef.current[currentQuestion]) {
+    answersRef.current[currentQuestion].selectedOption = idx // Use selectedOption for ExamAttempt
+  }
+}
+
+/* ================= UI ================= */
+const q = questions[currentQuestion]
+const progress = ((currentQuestion + 1) / questions.length) * 100
+
+if (loading || !q) {
+  return (
+    <div className="p-8">
+      <Card className="p-6">
+        Loading question...
+      </Card>
+    </div>
+  )
+}
+
+return (
+  <div className="p-8 space-y-6 relative">
+    {warningMsg && (
+      <div className="fixed top-4 right-4 bg-red-600 text-white px-4 py-2 rounded z-50">
+        ⚠️ {warningMsg} ({totalWarningsRef.current}/3)
+      </div>
+    )}
+
+    <div className="flex justify-between items-center">
+      <div className="flex gap-2 items-center">
+        <Clock />
+        {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')}
+      </div>
+      Question {currentQuestion + 1}/{questions.length}
+    </div>
+
+    <Progress value={progress} />
+
+    <Card className="p-6 space-y-4">
+      <h2 className="font-semibold">{q.question}</h2>
+      {q.options.map((opt: string, idx: number) => (
+        <button
+          key={idx}
+          onClick={() => selectAnswer(idx)}
+          className={`w-full p-3 border rounded ${
+            selectedAnswers[currentQuestion] === idx
+              ? 'bg-primary/10 border-primary'
+              : ''
+          }`}
+        >
+          {opt}
+        </button>
+      ))}
+    </Card>
+
+    <div className="flex justify-between">
+      <Button disabled={currentQuestion === 0} onClick={() => setCurrentQuestion(c => c - 1)}>
+        Previous
+      </Button>
+
+      {currentQuestion === questions.length - 1 ? (
+        <Button onClick={() => submit()}>Submit</Button>
+      ) : (
+        <Button onClick={() => setCurrentQuestion(c => c + 1)}>Next</Button>
+      )}
+    </div>
+
+    <CameraPreview active={!!attemptId} onFrame={onFaceFrame} />
+  </div>
+)
 }

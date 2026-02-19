@@ -1,150 +1,243 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import { Card } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell } from 'recharts'
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  BarChart,
+  Bar
+} from 'recharts'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from '@/components/ui/select'
 
 export default function ChildProgressPage() {
-  const monthlyData = [
-    { month: 'Week 1', score: 72 },
-    { month: 'Week 2', score: 75 },
-    { month: 'Week 3', score: 78 },
-    { month: 'Week 4', score: 82 },
-  ]
+  const [children, setChildren] = useState<any[]>([])
+  const [selectedChild, setSelectedChild] = useState('')
+  const [childProgress, setChildProgress] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
 
-  const subjectData = [
-    { subject: 'Math', score: 85, color: '#7C3AED' },
-    { subject: 'English', score: 78, color: '#3B82F6' },
-    { subject: 'Science', score: 88, color: '#10B981' },
-    { subject: 'History', score: 82, color: '#F59E0B' },
-  ]
+  const token =
+    typeof window !== 'undefined'
+      ? localStorage.getItem('token') || ''
+      : ''
 
-  const strengths = [
-    { category: 'Quizzes', percentage: 92 },
-    { category: 'Assignments', percentage: 85 },
-    { category: 'Projects', percentage: 78 },
-  ]
+  // Fetch children on mount
+  useEffect(() => {
+    const fetchChildren = async () => {
+      try {
+        const res = await fetch(
+          'http://localhost:5000/api/parent/dashboard',
+          {
+            headers: { Authorization: `Bearer ${token}` }
+          }
+        )
+        const data = await res.json()
+
+        const childrenArray = Array.isArray(data) ? data : []
+        setChildren(childrenArray)
+
+        if (childrenArray.length > 0) {
+          setSelectedChild(childrenArray[0]._id)
+        }
+      } catch (error) {
+        console.error('Failed to fetch children:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    if (token) fetchChildren()
+  }, [token])
+
+  // Fetch child progress when child is selected
+  useEffect(() => {
+    if (!selectedChild) return
+
+    const fetchChildProgress = async () => {
+      try {
+        const res = await fetch(
+          `http://localhost:5000/api/parent/child-progress/${selectedChild}`,
+          {
+            headers: { Authorization: `Bearer ${token}` }
+          }
+        )
+        const data = await res.json()
+        setChildProgress(data)
+      } catch (error) {
+        console.error('Failed to fetch child progress:', error)
+      }
+    }
+
+    fetchChildProgress()
+  }, [selectedChild, token])
+
+  // Generate score trend data
+  const generateScoreTrend = () => {
+    const attempts = childProgress?.recentAttempts ?? []
+    if (attempts.length === 0) return []
+
+    const monthlyScores: Record<
+      string,
+      { total: number; count: number }
+    > = {}
+
+    attempts.forEach((attempt: any) => {
+      const date = new Date(attempt.submittedAt)
+      const monthKey = `${date.getFullYear()}-${String(
+        date.getMonth() + 1
+      ).padStart(2, '0')}`
+
+      if (!monthlyScores[monthKey]) {
+        monthlyScores[monthKey] = { total: 0, count: 0 }
+      }
+
+      monthlyScores[monthKey].total += attempt.score || 0
+      monthlyScores[monthKey].count += 1
+    })
+
+    return Object.entries(monthlyScores)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .slice(-6)
+      .map(([month, data]) => ({
+        month: new Date(month + '-01').toLocaleDateString('en', {
+          month: 'short'
+        }),
+        score: Math.round(data.total / data.count)
+      }))
+  }
+
+  if (loading) {
+    return <div className="p-6">Loading...</div>
+  }
+
+  const subjectPerformance = childProgress?.subjectPerformance ?? {}
+  const recentAttempts = childProgress?.recentAttempts ?? []
 
   return (
     <div className="space-y-6 p-6">
-      <div>
-        <h1 className="text-3xl font-bold text-foreground">Emma's Progress</h1>
-        <p className="text-muted-foreground">Track detailed learning metrics and improvements</p>
+      {/* Child Selector */}
+      <div className="mb-6">
+        <label className="block text-sm font-medium mb-2">
+          Select Child
+        </label>
+        <Select value={selectedChild} onValueChange={setSelectedChild}>
+          <SelectTrigger>
+            <SelectValue placeholder="Choose a child..." />
+          </SelectTrigger>
+          <SelectContent>
+            {children.map((child) => (
+              <SelectItem key={child._id} value={child._id}>
+                {child.fullName}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
-      <Tabs defaultValue="overview" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="subjects">By Subject</TabsTrigger>
-          <TabsTrigger value="activities">Activities</TabsTrigger>
-        </TabsList>
+      {childProgress ? (
+        <>
+          {/* Header */}
+          <h1 className="text-3xl font-bold">
+            {children.find((c) => c._id === selectedChild)?.fullName}
+            ’s Progress
+          </h1>
 
-        <TabsContent value="overview" className="space-y-6">
-          <Card className="p-6">
-            <h2 className="mb-4 font-semibold text-foreground">Score Trend</h2>
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={monthlyData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis dataKey="month" />
-                <YAxis />
-                <Tooltip />
-                <Line type="monotone" dataKey="score" stroke="#7C3AED" strokeWidth={2} />
-              </LineChart>
-            </ResponsiveContainer>
-          </Card>
+          <Tabs defaultValue="overview">
+            <TabsList>
+              <TabsTrigger value="overview">Overview</TabsTrigger>
+              <TabsTrigger value="subjects">By Subject</TabsTrigger>
+              <TabsTrigger value="activities">Activities</TabsTrigger>
+            </TabsList>
 
-          <div className="grid gap-4 md:grid-cols-3">
-            <Card className="p-6">
-              <p className="text-sm text-muted-foreground">Current Average</p>
-              <p className="mt-2 text-3xl font-bold text-foreground">82%</p>
-              <p className="mt-2 text-xs text-green-600">↑ 5% from last month</p>
-            </Card>
-            <Card className="p-6">
-              <p className="text-sm text-muted-foreground">Quizzes Completed</p>
-              <p className="mt-2 text-3xl font-bold text-foreground">24</p>
-              <p className="mt-2 text-xs text-muted-foreground">This month</p>
-            </Card>
-            <Card className="p-6">
-              <p className="text-sm text-muted-foreground">Learning Streak</p>
-              <p className="mt-2 text-3xl font-bold text-foreground">12 days</p>
-              <p className="mt-2 text-xs text-blue-600">Keep it up!</p>
-            </Card>
-          </div>
-        </TabsContent>
+            {/* Overview */}
+            <TabsContent value="overview">
+              <div className="grid gap-4 md:grid-cols-4">
+                <Card className="p-6">
+                  <p>Total Exams</p>
+                  <p className="text-3xl">
+                    {childProgress.child?.totalExams ?? 0}
+                  </p>
+                </Card>
+                <Card className="p-6">
+                  <p>Average Score</p>
+                  <p className="text-3xl">
+                    {childProgress.child?.averageScore ?? 0}%
+                  </p>
+                </Card>
+                <Card className="p-6">
+                  <p>Pass Rate</p>
+                  <p className="text-3xl">
+                    {childProgress.child?.passRate ?? 0}%
+                  </p>
+                </Card>
+              </div>
 
-        <TabsContent value="subjects" className="space-y-6">
-          <Card className="p-6">
-            <h2 className="mb-4 font-semibold text-foreground">Performance by Subject</h2>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={subjectData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis dataKey="subject" />
-                <YAxis />
-                <Tooltip />
-                <Bar dataKey="score" fill="#7C3AED" />
-              </BarChart>
-            </ResponsiveContainer>
-          </Card>
-
-          <div className="grid gap-4">
-            {subjectData.map((subject) => (
-              <Card key={subject.subject} className="p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium text-foreground">{subject.subject}</p>
-                    <div className="mt-2 h-2 w-48 rounded-full bg-muted">
-                      <div
-                        className="h-full rounded-full"
-                        style={{
-                          width: `${subject.score}%`,
-                          backgroundColor: subject.color,
-                        }}
-                      />
-                    </div>
-                  </div>
-                  <p className="text-lg font-semibold text-foreground">{subject.score}%</p>
-                </div>
+              <Card className="p-6 mt-6">
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart data={generateScoreTrend()}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="month" />
+                    <YAxis />
+                    <Tooltip />
+                    <Line
+                      type="monotone"
+                      dataKey="score"
+                      stroke="#7C3AED"
+                      strokeWidth={2}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
               </Card>
-            ))}
-          </div>
-        </TabsContent>
+            </TabsContent>
 
-        <TabsContent value="activities" className="space-y-6">
-          <Card className="p-6">
-            <h2 className="mb-4 font-semibold text-foreground">Activity Strengths</h2>
-            <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
-                <Pie
-                  data={strengths}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  label={({ category, percentage }) => `${category}: ${percentage}%`}
-                  outerRadius={80}
-                  fill="#8884d8"
-                  dataKey="percentage"
+            {/* Subjects */}
+            <TabsContent value="subjects">
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart
+                  data={Object.entries(subjectPerformance).map(
+                    ([subject, perf]: any) => ({
+                      subject,
+                      score: perf.averageScore
+                    })
+                  )}
                 >
-                  <Cell fill="#7C3AED" />
-                  <Cell fill="#3B82F6" />
-                  <Cell fill="#10B981" />
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
-          </Card>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="subject" />
+                  <YAxis />
+                  <Tooltip />
+                  <Bar dataKey="score" fill="#7C3AED" />
+                </BarChart>
+              </ResponsiveContainer>
+            </TabsContent>
 
-          <div className="grid gap-4">
-            {strengths.map((activity) => (
-              <Card key={activity.category} className="p-4">
-                <div className="flex items-center justify-between">
-                  <p className="font-medium text-foreground">{activity.category}</p>
-                  <p className="text-lg font-semibold text-primary">{activity.percentage}%</p>
-                </div>
-              </Card>
-            ))}
-          </div>
-        </TabsContent>
-      </Tabs>
+            {/* Activities */}
+            <TabsContent value="activities">
+              {recentAttempts.map((attempt: any, index: number) => (
+                <Card key={index} className="p-4 mb-3">
+                  <p className="font-medium">
+                    {attempt.exam?.title}
+                  </p>
+                  <p>{attempt.score ?? 0}%</p>
+                </Card>
+              ))}
+            </TabsContent>
+          </Tabs>
+        </>
+      ) : (
+        <p>Select a child to view progress</p>
+      )}
     </div>
   )
 }

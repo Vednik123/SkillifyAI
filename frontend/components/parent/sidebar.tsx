@@ -23,7 +23,7 @@ export function ParentSidebar() {
     { label: 'Child Progress', href: '/parent/progress', icon: BarChart3 },
    { label: "Faculty of Child", href: "/parent/faculty", icon: Users },
     { label: 'Materials', href: '/parent/materials', icon: BookOpen },
-    { label: 'Certifications', href: '/parent/certifications', icon: Award },
+    // { label: 'Certifications', href: '/parent/certifications', icon: Award },
     { label: 'Notifications', href: '/parent/notifications', icon: Bell },
     { label: 'Profile', href: '/parent/profile', icon: User },
     

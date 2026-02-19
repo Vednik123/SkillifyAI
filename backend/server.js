@@ -19,6 +19,17 @@ import facultyOralStudentRoutes from "./routes/facultyOralStudentRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
 import facultyAnalyticsRoutes from "./routes/facultyAnalyticsRoutes.js";
 
+import examAssignmentRoutes from "./routes/examAssignmentRoutes.js";
+import proctorRoutes from "./routes/proctorRoutes.js";
+import quizRoutes from "./routes/quizRoutes.js";
+import quizAttemptRoutes from "./routes/quizAttemptRoutes.js";
+import quizResultRoutes from "./routes/quizResultRoutes.js";
+import facultyExamRoutes from "./routes/facultyExamRoutes.js";
+import studentExamRoutes from "./routes/studentExamRoutes.js";
+import facultyQuizReviewRoutes from "./routes/facultyQuizReviewRoutes.js";
+import facultyQuizAnalyticsRoutes from "./routes/facultyQuizAnalyticsRoutes.js";
+
+
 
 
 dotenv.config();
@@ -56,16 +67,30 @@ app.use("/api/student", studentRoutes);
 app.use("/api/faculty", facultyRoutes);
 app.use("/api/parent", parentRoutes);
 app.use("/api", aiRoutes);
+app.use("api/faculty/exams", examAssignmentRoutes);
+
 app.use("/api/courses", courseRoutes);
 app.use("/api/ai-mentor", aiMentorRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/ai-tutor", aiTutorRoutes);
+
+app.use("/api/proctor", proctorRoutes);
+app.use("/api/quiz", quizRoutes);
+app.use("/api/quiz/attempt", quizAttemptRoutes)
+app.use("/api/quiz/result", quizResultRoutes);
+app.use("/api/faculty/exams", facultyExamRoutes);
+app.use("/api/student/exams", studentExamRoutes);
+app.use("/api/faculty", facultyQuizReviewRoutes);
+app.use("/api/faculty/analytics", facultyQuizAnalyticsRoutes);
+
+
 app.use("/api/interviews", interviewRoutes);
 app.use("/api/oral", oralRoutes);
 app.use("/api/faculty/oral", facultyOralRoutes);
 app.use("/api/student/faculty-oral", facultyOralStudentRoutes);
 app.use("/api/user", userRoutes);
 app.use("/api/faculty/analytics", facultyAnalyticsRoutes);
+
 
 
 // ✅ Server start

@@ -48,6 +48,22 @@ export default function InterviewSessionPage() {
     fetchSession();
   }, [id]);
 
+//   useEffect(() => {
+//   const fakeSession = {
+//     totalQuestions: 3,
+//     duration: 5,
+//     questions: [
+//       { question: "Tell me about yourself." },
+//       { question: "What are your strengths?" },
+//       { question: "Why should we hire you?" },
+//     ],
+//   };
+
+//   setSession(fakeSession);
+//   setTimeRemaining(fakeSession.duration * 60);
+// }, []);
+
+
   /* ================= TIMER ================= */
 
   useEffect(() => {
@@ -190,11 +206,11 @@ export default function InterviewSessionPage() {
 
   /* ================= SPEECH ================= */
 
-  const speakText = (text: string) => {
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(text);
-    window.speechSynthesis.speak(utterance);
-  };
+  // const speakText = (text: string) => {
+  //   window.speechSynthesis.cancel();
+  //   const utterance = new SpeechSynthesisUtterance(text);
+  //   window.speechSynthesis.speak(utterance);
+  // };
 
   /* ================= RECORDING ================= */
 
@@ -255,7 +271,7 @@ export default function InterviewSessionPage() {
         userAnswer: transcript,
       }),
     });
-    
+
     setTranscript("");
 
     if (currentQuestionIndex + 1 < session.totalQuestions) {
@@ -263,7 +279,7 @@ export default function InterviewSessionPage() {
       setCurrentQuestionIndex(nextIndex);
 
       const nextQ = session.questions[nextIndex]?.question;
-      speakText(nextQ);
+      // speakText(nextQ);
     } else {
       handleSubmitInterview();
     }
@@ -292,19 +308,19 @@ export default function InterviewSessionPage() {
     router.push(`/student/interview/results/${id}`);
   };
 
-  const hasSpokenRef = useRef(false);
-  useEffect(() => {
-    if (!session) return;
+  // const hasSpokenRef = useRef(false);
+  // useEffect(() => {
+  //   if (!session) return;
 
-    if (!hasSpokenRef.current) {
-      const firstQuestion = session.questions[0]?.question;
+  //   if (!hasSpokenRef.current) {
+  //     const firstQuestion = session.questions[0]?.question;
 
-      if (firstQuestion) {
-        speakText(firstQuestion);
-        hasSpokenRef.current = true;
-      }
-    }
-  }, [session]);
+  //     if (firstQuestion) {
+  //       speakText(firstQuestion);
+  //       hasSpokenRef.current = true;
+  //     }
+  //   }
+  // }, [session]);
 
   if (!session) return <div className="p-8">Loading...</div>;
 
@@ -335,17 +351,18 @@ export default function InterviewSessionPage() {
         <div className="grid lg:grid-cols-2 gap-8">
           {/* AI Side */}
           <Card className="p-8 text-center space-y-6">
-            <img src="/ai-idle.png" className="w-56 mx-auto" />
+            {/* <img src="/ai-idle.png" className="w-56 mx-auto" /> */}
+            <AIInterviewer text={currentQuestion} autoSpeak={true} />
 
             <p className="text-lg font-medium">{currentQuestion}</p>
 
-            <Button
+            {/* <Button
               onClick={() => speakText(currentQuestion)}
               variant="outline"
             >
               <Volume2 className="w-4 h-4 mr-2" />
               Hear Question
-            </Button>
+            </Button> */}
           </Card>
 
           {/* Camera Side */}

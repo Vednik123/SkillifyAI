@@ -51,7 +51,7 @@ export default function AIInterviewer({ text, autoSpeak }: Props) {
 
   return (
     <div className="relative flex flex-col items-center">
-      <div className="relative w-64 h-64">
+      <div className="relative w-full max-w-xl aspect-video">
         
         {/* Idle Video */}
         <video
@@ -60,7 +60,7 @@ export default function AIInterviewer({ text, autoSpeak }: Props) {
           autoPlay
           loop
           muted
-          className={`absolute inset-0 rounded-full object-cover transition-opacity duration-300 ${
+          className={`absolute inset-0 w-full h-full object-cover rounded-2xl shadow-xl ${
             isSpeaking ? "opacity-0" : "opacity-100"
           }`}
         />
@@ -72,14 +72,14 @@ export default function AIInterviewer({ text, autoSpeak }: Props) {
           autoPlay
           loop
           muted
-          className={`absolute inset-0 rounded-full object-cover transition-opacity duration-300 ${
+          className={`absolute inset-0 w-full h-full object-cover rounded-2xl shadow-xl ${
             isSpeaking ? "opacity-100" : "opacity-0"
           }`}
         />
 
         {/* Blink Overlay */}
         {blink && (
-          <div className="absolute inset-0 bg-black opacity-20 rounded-full transition-all duration-150" />
+          <div className="absolute inset-0 w-full h-full object-cover rounded-2xl shadow-xl bg-black opacity-20 transition-all duration-150" />
         )}
       </div>
 

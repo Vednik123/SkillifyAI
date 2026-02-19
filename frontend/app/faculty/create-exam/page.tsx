@@ -1,7 +1,5 @@
 'use client'
 
-import React from "react"
-
 import { useState } from 'react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -28,13 +26,28 @@ export default function CreateExamPage() {
   const [isGenerating, setIsGenerating] = useState(false)
   const [quizGenerated, setQuizGenerated] = useState(false)
   const [generatedQuiz, setGeneratedQuiz] = useState<any>(null)
+  const [totalQuestions, setTotalQuestions] = useState(10)
+const [duration, setDuration] = useState(60)
+const [examId, setExamId] = useState<string | null>(null)
+const [editingQuestion, setEditingQuestion] = useState<any | null>(null)
+const [editText, setEditText] = useState('')
+const [editOptions, setEditOptions] = useState<string[]>([])
+const [editCorrect, setEditCorrect] = useState<number>(0)
+const [examApproved, setExamApproved] = useState(false)
+const [showSchedule, setShowSchedule] = useState(false)
+const [showAssign, setShowAssign] = useState(false)
+const [assignType, setAssignType] = useState<'ALL' | 'SELECTED'>('ALL')
+const [students, setStudents] = useState<any[]>([])
+const [selectedStudents, setSelectedStudents] = useState<string[]>([])
+
+
 
   // Sample generated questions
-  const sampleQuestions = [
-    { id: 1, question: 'What is integration?', type: 'short' },
-    { id: 2, question: 'Solve: ∫(2x + 3)dx', type: 'short' },
-    { id: 3, question: 'Find the indefinite integral', type: 'multiple', options: ['A', 'B', 'C', 'D'] },
-  ]
+  // const sampleQuestions = [
+  //   { id: 1, question: 'What is integration?', type: 'short' },
+  //   { id: 2, question: 'Solve: ∫(2x + 3)dx', type: 'short' },
+  //   { id: 3, question: 'Find the indefinite integral', type: 'multiple', options: ['A', 'B', 'C', 'D'] },
+  // ]
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -42,33 +55,244 @@ export default function CreateExamPage() {
     }
   }
 
-  const handleGenerateQuiz = () => {
-    if (topic && subject && difficulty) {
-      setIsGenerating(true)
-      setTimeout(() => {
-        setGeneratedQuiz({
-          topic,
-          subject,
-          difficulty,
-          questions: sampleQuestions,
-          scheduledDate,
-          scheduledTime,
-        })
-        setQuizGenerated(true)
-        setIsGenerating(false)
-      }, 1500)
-    }
+  const handleGenerateQuiz = async () => {
+  if (!topic || !subject || !difficulty || !notesFile) {
+    alert("Please fill all required fields and upload notes");
+    return;
   }
 
-  const handleAssignQuiz = () => {
-    alert(`Quiz "${topic}" assigned to all students successfully!`)
-    setQuizGenerated(false)
-    setGeneratedQuiz(null)
-    setTopic('')
-    setDescription('')
-    setSubject('')
-    setDifficulty('')
+  setIsGenerating(true);
+
+  try {
+    const formData = new FormData();
+
+    // ✅ ONLY ONE FILE, CORRECT VARIABLE
+    formData.append("file", notesFile);
+
+    formData.append("title", topic);
+    formData.append("description", description);
+    formData.append("subject", subject);
+    formData.append("difficulty", difficulty);
+    formData.append("totalQuestions", String(totalQuestions));
+    formData.append("duration", String(duration));
+
+    console.log("🚀 Sending request to:", "http://localhost:5000/api/faculty/exams/create");
+    console.log("📤 Form data contents:");
+    for (let [key, value] of formData.entries()) {
+      console.log(`${key}:`, value);
+    }
+
+    // Test simple request first
+    try {
+      const testRes = await fetch("http://localhost:5000/api/faculty/exams/test");
+      console.log("🧪 Backend test response:", await testRes.json());
+    } catch (testErr) {
+      console.error("❌ Backend test failed:", testErr);
+    }
+
+    const res = await fetch(
+      "http://localhost:5000/api/faculty/exams/create",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+        body: formData, // ❌ DO NOT set Content-Type
+      }
+    );
+
+    console.log("📥 Response status:", res.status);
+    console.log("📥 Response headers:", [...res.headers.entries()]);
+
+    if (!res.ok) {
+      const errorText = await res.text();
+      console.error("❌ Error response text:", errorText);
+      throw new Error(errorText || "Quiz generation failed");
+    }
+
+    const data = await res.json();
+    console.log("✅ Success response:", data);
+
+    setExamId(data.examId);
+
+    setGeneratedQuiz({
+      topic,
+      subject,
+      difficulty,
+      questions: data.questions,
+    });
+
+    setQuizGenerated(true);
+  } catch (err: any) {
+    console.error("❌ Quiz generation error:", err);
+    console.error("❌ Error stack:", err.stack);
+    alert(`Failed to generate quiz: ${err.message}`);
+  } finally {
+    setIsGenerating(false);
   }
+};
+
+  const handleSaveEdit = async () => {
+  if (!editingQuestion || !examId) return
+
+  try {
+    const res = await fetch(
+      `http://localhost:5000/api/faculty/exams/${examId}/question/${editingQuestion.questionId}`,
+      {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${localStorage.getItem('token')}`,
+        },
+        body: JSON.stringify({
+          question: editText,
+          options: editOptions,
+          correctAnswer: editCorrect,
+        }),
+      }
+    )
+
+    const data = await res.json()
+
+    setGeneratedQuiz((prev: any) => ({
+      ...prev,
+      questions: data.questions,
+    }))
+
+    setEditingQuestion(null)
+  } catch (err) {
+    alert('Failed to update question')
+  }
+}
+
+  const handleDeleteQuestion = async (questionId: string) => {
+  if (!examId) return
+
+  try {
+    const res = await fetch(
+      `http://localhost:5000/api/faculty/exams/${examId}/question/${questionId}`,
+      {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('token')}`,
+        },
+      }
+    )
+
+    const data = await res.json()
+
+    setGeneratedQuiz((prev: any) => ({
+      ...prev,
+      questions: data.questions,
+    }))
+  } catch (err) {
+    alert('Failed to delete question')
+  }
+}
+
+const openEditQuestion = (q: any) => {
+  setEditingQuestion(q)
+  setEditText(q.question)
+  setEditOptions([...q.options])
+  setEditCorrect(q.correctAnswer)
+}
+
+const handleApproveExam = async () => {
+  if (!examId) return
+
+  try {
+    const res = await fetch(
+      `http://localhost:5000/api/faculty/exams/${examId}/approve`,
+      {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      }
+    )
+
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.message)
+
+    setExamApproved(true)
+    alert("Exam approved successfully!")
+  } catch (err) {
+    alert("Failed to approve exam")
+  }
+}
+
+const handleScheduleExam = async () => {
+  if (!examId || !scheduledDate || !scheduledTime) return
+
+  try {
+    const res = await fetch(
+      `http://localhost:5000/api/faculty/exams/${examId}/schedule`,
+      {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+        body: JSON.stringify({
+          scheduledAt: `${scheduledDate}T${scheduledTime}:00`,
+          duration,
+        }),
+      }
+    )
+
+    if (!res.ok) throw new Error("Schedule failed")
+
+    alert("Exam scheduled successfully")
+    setShowSchedule(false)
+  } catch {
+    alert("Failed to schedule exam")
+  }
+}
+
+const fetchStudents = async () => {
+  try {
+    const res = await fetch(
+      "http://localhost:5000/api/faculty/students",
+      {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      }
+    )
+
+    const data = await res.json()
+    setStudents(data)
+  } catch (err) {
+    alert("Failed to load students")
+  }
+}
+
+const handleAssignStudents = async () => {
+  if (!examId) return
+
+  try {
+    await fetch(
+      `http://localhost:5000/api/faculty/exams/${examId}/assign`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+        body: JSON.stringify({
+          assignType,
+          studentIds: selectedStudents,
+        }),
+      }
+    )
+
+    alert("Exam assigned successfully")
+    setSelectedStudents([])
+    setShowAssign(false)
+  } catch {
+    alert("Failed to assign exam")
+  }
+}
 
   return (
     <div className="p-8 space-y-8">
@@ -142,22 +366,20 @@ export default function CreateExamPage() {
               </div>
 
               {/* Subject */}
-              <div className="space-y-2">
-                <Label className="text-sm font-medium text-foreground">
-                  Subject <span className="text-red-500">*</span>
-                </Label>
-                <Select value={subject} onValueChange={setSubject}>
-                  <SelectTrigger className="h-10 border-border bg-background">
-                    <SelectValue placeholder="Select subject" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="mathematics">Mathematics</SelectItem>
-                    <SelectItem value="physics">Physics</SelectItem>
-                    <SelectItem value="chemistry">Chemistry</SelectItem>
-                    <SelectItem value="biology">Biology</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+<div className="space-y-2">
+  <Label htmlFor="subject" className="text-sm font-medium text-foreground">
+    Subject <span className="text-red-500">*</span>
+  </Label>
+  <Input
+    id="subject"
+    type="text"
+    placeholder="e.g., Calculus, Data Structures, Organic Chemistry"
+    value={subject}
+    onChange={(e) => setSubject(e.target.value)}
+    required
+    className="h-10 border-border bg-background"
+  />
+</div>
 
               {/* Difficulty */}
               <div className="space-y-2">
@@ -176,33 +398,36 @@ export default function CreateExamPage() {
                 </Select>
               </div>
 
-              {/* Schedule Date */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="date" className="text-sm font-medium text-foreground">
-                    Scheduled Date
-                  </Label>
-                  <Input
-                    id="date"
-                    type="date"
-                    value={scheduledDate}
-                    onChange={(e) => setScheduledDate(e.target.value)}
-                    className="h-10 border-border bg-background"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="time" className="text-sm font-medium text-foreground">
-                    Scheduled Time
-                  </Label>
-                  <Input
-                    id="time"
-                    type="time"
-                    value={scheduledTime}
-                    onChange={(e) => setScheduledTime(e.target.value)}
-                    className="h-10 border-border bg-background"
-                  />
-                </div>
-              </div>
+              {/* Number of Questions */}
+<div className="space-y-2">
+  <Label className="text-sm font-medium text-foreground">
+    Number of Questions <span className="text-red-500">*</span>
+  </Label>
+  <Input
+    type="number"
+    min={5}
+    max={50}
+    value={totalQuestions}
+    onChange={(e) => setTotalQuestions(Number(e.target.value))}
+    className="h-10 border-border bg-background"
+  />
+</div>
+
+{/* Duration */}
+<div className="space-y-2">
+  <Label className="text-sm font-medium text-foreground">
+    Duration (minutes) <span className="text-red-500">*</span>
+  </Label>
+  <Input
+    type="number"
+    min={10}
+    value={duration}
+    onChange={(e) => setDuration(Number(e.target.value))}
+    className="h-10 border-border bg-background"
+  />
+</div>
+
+              
 
               {/* Generate Button */}
               <Button
@@ -275,6 +500,46 @@ export default function CreateExamPage() {
                 </button>
               </div>
 
+              {editingQuestion && (
+  <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+    <Card className="w-full max-w-xl p-6 space-y-4">
+      <h2 className="text-lg font-bold">Edit Question</h2>
+
+      <Input
+        value={editText}
+        onChange={(e) => setEditText(e.target.value)}
+      />
+
+      {editOptions.map((opt, idx) => (
+        <div key={idx} className="flex gap-2 items-center">
+          <input
+            type="radio"
+            checked={editCorrect === idx}
+            onChange={() => setEditCorrect(idx)}
+          />
+          <Input
+            value={opt}
+            onChange={(e) => {
+              const copy = [...editOptions]
+              copy[idx] = e.target.value
+              setEditOptions(copy)
+            }}
+          />
+        </div>
+      ))}
+
+      <div className="flex justify-end gap-3 pt-4">
+        <Button variant="outline" onClick={() => setEditingQuestion(null)}>
+          Cancel
+        </Button>
+        <Button onClick={handleSaveEdit}>
+          Save Changes
+        </Button>
+      </div>
+    </Card>
+  </div>
+)}
+
               {/* Quiz Details */}
               <div className="grid grid-cols-3 gap-4 p-4 bg-secondary rounded-lg">
                 <div>
@@ -294,48 +559,192 @@ export default function CreateExamPage() {
               {/* Questions Preview */}
               <div className="space-y-3 max-h-96 overflow-y-auto border border-border rounded-lg p-4">
                 <h3 className="font-semibold text-foreground mb-4">Generated Questions ({generatedQuiz.questions.length})</h3>
-                {generatedQuiz.questions.map((q: any, idx: number) => (
-                  <div key={q.id} className="p-3 bg-secondary/50 rounded-lg border border-border">
-                    <p className="font-medium text-sm text-foreground">Q{idx + 1}: {q.question}</p>
-                    {q.options && (
-                      <div className="mt-2 ml-4 space-y-1">
-                        {q.options.map((opt: string, i: number) => (
-                          <p key={i} className="text-xs text-muted-foreground">{String.fromCharCode(65 + i)}) {opt}</p>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
+                {generatedQuiz?.questions?.map((q: any, idx: number) => (
+  <div
+    key={q.questionId}
+    className="p-3 bg-secondary/50 rounded-lg border border-border space-y-2"
+  >
+    <p className="font-medium text-sm">
+      Q{idx + 1}: {q.question}
+    </p>
 
-              {/* Scheduled Info */}
-              {generatedQuiz.scheduledDate && (
-                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                  <p className="text-sm text-blue-900">
-                    <strong>Scheduled for:</strong> {generatedQuiz.scheduledDate} at {generatedQuiz.scheduledTime || 'Not specified'}
-                  </p>
-                </div>
-              )}
+    <div className="ml-4 space-y-1">
+      {q.options.map((opt: string, i: number) => (
+        <p
+          key={i}
+          className={`text-xs ${
+            q.correctAnswer === i
+              ? 'text-green-600 font-semibold'
+              : 'text-muted-foreground'
+          }`}
+        >
+          {String.fromCharCode(65 + i)}) {opt}
+        </p>
+      ))}
+    </div>
+
+    <div className="flex gap-3 pt-2">
+      <Button
+  size="sm"
+  variant="outline"
+  disabled={examApproved}
+  onClick={() => openEditQuestion(q)}
+>
+  Edit
+</Button>
+
+      <Button
+  size="sm"
+  variant="destructive"
+  disabled={examApproved}
+  onClick={() => handleDeleteQuestion(q.questionId)}
+>
+  Delete
+</Button>
+    </div>
+  </div>
+))}
+              </div>
 
               <div className="flex gap-3">
-                <Button 
-                  onClick={handleAssignQuiz}
-                  className="flex-1 bg-green-600 hover:bg-green-700"
-                >
-                  Assign to Students
-                </Button>
-                <Button 
-                  onClick={() => setQuizGenerated(false)}
-                  variant="outline" 
-                  className="flex-1"
-                >
-                  Cancel
-                </Button>
+  {!examApproved ? (
+  <Button
+    onClick={handleApproveExam}
+    className="flex-1 bg-green-600"
+  >
+    Approve Exam
+  </Button>
+) : (
+  <>
+    <Button
+      onClick={() => setShowSchedule(true)}
+      className="flex-1 bg-blue-600"
+    >
+      Schedule Exam
+    </Button>
+
+    <Button
+      onClick={() => {
+        setShowAssign(true)
+        fetchStudents()
+      }}
+      className="flex-1 bg-purple-600"
+    >
+      Assign Students
+    </Button>
+  </>
+)}
+
+  <Button
+    onClick={() => setQuizGenerated(false)}
+    variant="outline"
+    className="flex-1"
+  >
+    Close
+  </Button>
+</div>
               </div>
-            </div>
           </Card>
         </div>
       )}
+      {showSchedule && (
+  <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+    <Card className="w-full max-w-md p-6 space-y-4">
+      <h2 className="text-lg font-bold">Schedule Exam</h2>
+
+      <div className="space-y-2">
+        <Label>Date</Label>
+        <Input
+          type="date"
+          value={scheduledDate}
+          onChange={(e) => setScheduledDate(e.target.value)}
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label>Time</Label>
+        <Input
+          type="time"
+          value={scheduledTime}
+          onChange={(e) => setScheduledTime(e.target.value)}
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label>Duration (minutes)</Label>
+        <Input
+          type="number"
+          min={10}
+          value={duration}
+          onChange={(e) => setDuration(Number(e.target.value))}
+        />
+      </div>
+
+      <div className="flex justify-end gap-3 pt-4">
+        <Button
+          variant="outline"
+          onClick={() => setShowSchedule(false)}
+        >
+          Cancel
+        </Button>
+        <Button onClick={handleScheduleExam}>
+          Confirm Schedule
+        </Button>
+      </div>
+    </Card>
+  </div>
+)}
+
+{showAssign && (
+  <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+    <Card className="w-full max-w-lg p-6 space-y-4">
+      <h2 className="text-lg font-bold">Assign Students</h2>
+
+      <Select
+  value={assignType}
+  onValueChange={(v) => setAssignType(v as 'ALL' | 'SELECTED')}
+>
+        <SelectTrigger>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="ALL">All Students</SelectItem>
+          <SelectItem value="SELECTED">Selected Students</SelectItem>
+        </SelectContent>
+      </Select>
+
+      {assignType === "SELECTED" && (
+        <div className="max-h-60 overflow-y-auto space-y-2 border p-2 rounded">
+          {students.map((s) => (
+            <label key={s._id} className="flex gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={selectedStudents.includes(s._id)}
+                onChange={() =>
+                  setSelectedStudents(prev =>
+                    prev.includes(s._id)
+                      ? prev.filter(id => id !== s._id)
+                      : [...prev, s._id]
+                  )
+                }
+              />
+              {s.name} ({s.email})
+            </label>
+          ))}
+        </div>
+      )}
+
+      <div className="flex justify-end gap-3 pt-4">
+        <Button variant="outline" onClick={() => setShowAssign(false)}>
+          Cancel
+        </Button>
+        <Button onClick={handleAssignStudents}>
+          Confirm Assign
+        </Button>
+      </div>
+    </Card>
+  </div>
+)}
     </div>
   )
 }

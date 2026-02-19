@@ -1,0 +1,45 @@
+import mongoose from "mongoose";
+
+const examAttemptSchema = new mongoose.Schema(
+  {
+    exam: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Exam",
+      required: true,
+    },
+    student: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+
+    answers: [
+      {
+        questionId: String,
+        selectedOption: Number,
+      },
+    ],
+
+    score: Number,
+    totalQuestions: Number,
+
+    startedAt: Date,
+    submittedAt: Date,
+
+    status: {
+      type: String,
+      enum: ["STARTED", "SUBMITTED", "AUTO_SUBMITTED"],
+      default: "STARTED",
+    },
+
+    proctoring: {
+  faceWarnings: { type: Number, default: 0 },
+  escWarnings: { type: Number, default: 0 },
+  autoSubmitted: { type: Boolean, default: false },
+  reasons: { type: [String], default: [] },
+},
+  },
+  { timestamps: true }
+);
+
+export default mongoose.model("ExamAttempt", examAttemptSchema);

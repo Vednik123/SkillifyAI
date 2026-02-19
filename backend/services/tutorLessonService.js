@@ -3,36 +3,75 @@ import axios from "axios";
 export const generateTutorLesson = async (topic, minutes = 5) => {
   const apiKey = process.env.GEMINI_EXTENSION_TUTOR_API_KEY;
 
-  const prompt = `
-You are an expert classroom teacher.
-
-Teach the topic "${topic}" clearly for approximately ${minutes} minutes.
-
-Return ONLY JSON in this format:
-
-{
-  "steps": [
-    {
-      "title": "Introduction",
-      "content": ["Sentence one", "Sentence two"]
-    }
-  ]
-}
-`;
+  if (!apiKey) {
+    throw new Error("Gemini API key missing");
+  }
 
   const response = await axios.post(
     `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
     {
-      contents: [{ parts: [{ text: prompt }] }]
+      contents: [
+        {
+          parts: [
+            {
+              text: `
+You are an experienced classroom teacher.
+
+Teach the topic "${topic}" for about ${minutes} minutes.
+
+Return STRICT JSON ONLY in this format:
+
+{
+  "steps": [
+    {
+      "title": "INTRODUCTION",
+      "content": [
+        "Point one",
+        "Point two"
+      ]
+    },
+    {
+      "title": "CORE CONCEPT",
+      "content": [
+        "Point one",
+        "Point two"
+      ]
+    }
+  ]
+}
+
+Rules:
+- Use bullet-style points
+- No paragraphs
+- No markdown
+- No explanations outside JSON
+`
+            }
+          ]
+        }
+      ]
+    },
+    {
+      headers: {
+        "Content-Type": "application/json"
+      }
     }
   );
 
-  const raw =
+  const rawText =
     response.data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
 
-  const cleaned = raw.replace(/```json|```/g, "").trim();
+  // Clean Gemini formatting issues
+  const cleaned = rawText
+    .replace(/```json/g, "")
+    .replace(/```/g, "")
+    .trim();
 
-  const parsed = JSON.parse(cleaned);
-
-  return parsed.steps || [];
+  try {
+    const parsed = JSON.parse(cleaned);
+    return parsed.steps || [];
+  } catch (err) {
+    console.error("Gemini JSON parse failed:", cleaned);
+    return [];
+  }
 };

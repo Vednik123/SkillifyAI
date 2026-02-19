@@ -11,7 +11,6 @@ export const startTutorSession = async (req, res) => {
     const steps = await generateTutorLesson(topic, minutes || 5);
 
     return res.json({ steps });
-
   } catch (error) {
     console.error("Tutor error:", error.message);
     return res.status(500).json({ steps: [] });

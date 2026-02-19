@@ -17,3 +17,10 @@ export const getFaceEmbedding = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+
+export const getMyFaculties = async (req, res) => {
+  const user = await User.findById(req.user._id)
+    .populate("faculties", "fullName email");
+
+  res.json({ faculties: user.faculties });
+};

@@ -1,189 +1,274 @@
 'use client'
 
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import {
-  BarChart,
-  Bar,
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
+  PieChart,
+  Pie,
+  Cell,
+  ResponsiveContainer,
   Tooltip,
   Legend,
-  ResponsiveContainer,
 } from 'recharts'
-import { Users, FileText, Clock, TrendingUp } from 'lucide-react'
-
-const scheduleData = [
-  {
-    id: 1,
-    title: 'Mathematics - Calculus',
-    date: 'March 20, 2024',
-    time: '10:00 AM',
-    students: 32,
-    status: 'upcoming',
-  },
-  {
-    id: 2,
-    title: 'Physics - Quantum Mechanics',
-    date: 'March 22, 2024',
-    time: '2:00 PM',
-    students: 28,
-    status: 'upcoming',
-  },
-  {
-    id: 3,
-    title: 'Chemistry - Organic Chemistry',
-    date: 'March 18, 2024',
-    time: '11:00 AM',
-    students: 30,
-    status: 'completed',
-  },
-]
-
-const performanceData = [
-  { subject: 'Math', avg: 82 },
-  { subject: 'Physics', avg: 78 },
-  { subject: 'Chemistry', avg: 85 },
-  { subject: 'English', avg: 80 },
-]
-
-const kpiData = [
-  {
-    label: 'Total Students',
-    value: '156',
-    icon: Users,
-    color: 'bg-blue-100',
-    iconColor: 'text-blue-600',
-  },
-  {
-    label: 'Exams Created',
-    value: '24',
-    icon: FileText,
-    color: 'bg-green-100',
-    iconColor: 'text-green-600',
-  },
-  {
-    label: 'Pending Reviews',
-    value: '8',
-    icon: Clock,
-    color: 'bg-yellow-100',
-    iconColor: 'text-yellow-600',
-  },
-  {
-    label: 'Avg Pass Rate',
-    value: '82%',
-    icon: TrendingUp,
-    color: 'bg-purple-100',
-    iconColor: 'text-purple-600',
-  },
-]
+import { Users, FileText, TrendingUp } from 'lucide-react'
 
 export default function FacultyDashboard() {
+  const router = useRouter()
+  const [loading, setLoading] = useState(true)
+  const [dashboardData, setDashboardData] = useState({
+    totalStudents: 0,
+    totalExams: 0,
+    avgPassRate: 0,
+    recentExams: [] as any[],
+    subjectPerformance: [] as any[],
+  })
+
+  const token =
+    typeof window !== 'undefined' ? localStorage.getItem('token') || '' : ''
+
+  const COLORS = ['#7C3AED', '#3B82F6', '#10B981', '#F59E0B', '#EF4444']
+
+  /* ================= FETCH DASHBOARD ================= */
+  useEffect(() => {
+    if (!token) {
+      router.push('/login')
+      return
+    }
+
+    const fetchDashboardData = async () => {
+      try {
+        const res = await fetch(
+          'http://localhost:5000/api/faculty/dashboard',
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        )
+
+        if (!res.ok) throw new Error('Failed to fetch dashboard')
+
+        const data = await res.json()
+
+        setDashboardData({
+          totalStudents: data.totalStudents || 0,
+          totalExams: data.totalExams || 0,
+          avgPassRate: data.avgPassRate || 0,
+          recentExams: data.recentExams || [],
+          subjectPerformance: data.subjectPerformance || [],
+        })
+      } catch (err) {
+        console.error('Dashboard fetch failed:', err)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchDashboardData()
+  }, [token, router])
+
+  /* ================= KPI CARD ================= */
+  function KpiCard({ icon, label, value }: any) {
+    return (
+      <Card className="p-6 flex items-center gap-4">
+        <div className="p-3 bg-muted rounded">{icon}</div>
+        <div>
+          <p className="text-sm text-muted-foreground">{label}</p>
+          <p className="text-2xl font-bold">{value}</p>
+        </div>
+      </Card>
+    )
+  }
+
+  if (loading) {
+    return (
+      <div className="p-8 text-center text-muted-foreground">
+        Loading dashboard...
+      </div>
+    )
+  }
+
   return (
     <div className="p-8 space-y-8">
-      {/* Header */}
+      {/* HEADER */}
       <div>
-        <h1 className="text-3xl font-bold text-foreground">Welcome back, Prof. Smith!</h1>
-        <p className="text-muted-foreground mt-2">Manage your exams, students, and track their progress</p>
+        <h1 className="text-3xl font-bold">Faculty Dashboard</h1>
+        <p className="text-muted-foreground mt-2">
+          Manage your exams, students, and track their progress
+        </p>
       </div>
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {kpiData.map((kpi, index) => {
-          const Icon = kpi.icon
-          return (
-            <Card key={index} className="p-6 border border-border hover:shadow-md transition-shadow">
-              <div className="space-y-4">
-                <div className={`w-12 h-12 rounded-lg ${kpi.color} flex items-center justify-center`}>
-                  <Icon className={`w-6 h-6 ${kpi.iconColor}`} />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-foreground">{kpi.value}</p>
-                  <p className="text-xs text-muted-foreground mt-1">{kpi.label}</p>
-                </div>
-              </div>
-            </Card>
-          )
-        })}
+      {/* KPI CARDS */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <KpiCard
+          icon={<Users />}
+          label="Total Students"
+          value={dashboardData.totalStudents}
+        />
+        <KpiCard
+          icon={<FileText />}
+          label="Exams Created"
+          value={dashboardData.totalExams}
+        />
+        <KpiCard
+          icon={<TrendingUp />}
+          label="Avg Pass Rate"
+          value={`${dashboardData.avgPassRate}%`}
+        />
       </div>
 
-      {/* Charts Section */}
+      {/* MAIN SECTION */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Schedule Overview */}
-        <Card className="p-6 border border-border">
-          <div className="space-y-4">
-            <h2 className="text-lg font-semibold text-foreground">Upcoming Exams</h2>
+        {/* RECENT EXAMS */}
+        <Card className="p-6">
+          <h2 className="text-lg font-semibold mb-4">Recent Exams</h2>
+
+          {dashboardData.recentExams.length === 0 ? (
+            <p className="text-center text-muted-foreground py-6">
+              No exams created yet
+            </p>
+          ) : (
             <div className="space-y-3">
-              {scheduleData.filter((s) => s.status === 'upcoming').map((schedule) => (
-                <div key={schedule.id} className="flex items-center justify-between p-3 rounded-lg bg-secondary/50 border border-border">
+              {dashboardData.recentExams.slice(0, 5).map((exam, index) => (
+                <div
+                  key={index}
+                  className="flex justify-between items-center p-3 border rounded bg-secondary/50"
+                >
                   <div>
-                    <p className="font-medium text-foreground text-sm">{schedule.title}</p>
-                    <p className="text-xs text-muted-foreground">{schedule.date} at {schedule.time}</p>
+                    <p className="font-medium">{exam.title}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {exam.studentsCount} students
+                    </p>
                   </div>
-                  <span className="text-xs font-semibold text-primary bg-primary/10 px-2 py-1 rounded">
-                    {schedule.students} students
+
+                  <span
+                    className={`px-3 py-1 rounded text-sm font-medium ${
+                      exam.status === 'completed'
+                        ? 'bg-green-100 text-green-800'
+                        : 'bg-blue-100 text-blue-800'
+                    }`}
+                  >
+                    {exam.status === 'completed' ? 'Completed' : 'Active'}
                   </span>
                 </div>
               ))}
             </div>
-          </div>
+          )}
         </Card>
 
-        {/* Performance Overview */}
-        <Card className="p-6 border border-border">
-          <div className="space-y-4">
-            <h2 className="text-lg font-semibold text-foreground">Average Performance by Subject</h2>
-            <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={performanceData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis dataKey="subject" />
-                <YAxis />
-                <Tooltip />
-                <Bar dataKey="avg" fill="#7C3AED" radius={[8, 8, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+        {/* PERFORMANCE METRICS */}
+        <Card className="p-6">
+          <h2 className="text-lg font-semibold mb-4">Performance Overview</h2>
+
+          {dashboardData.subjectPerformance.length === 0 ? (
+            <p className="text-center text-muted-foreground py-10">
+              No performance data available
+            </p>
+          ) : (
+            <div className="grid grid-cols-2 gap-6">
+              {/* PIE CHART */}
+              <div>
+                <ResponsiveContainer width="100%" height={250}>
+                  <PieChart>
+                    <Pie
+                      data={dashboardData.subjectPerformance}
+                      dataKey="avgScore"
+                      nameKey="subject"
+                      cx="50%"
+                      cy="50%"
+                      outerRadius={80}
+                      innerRadius={40}
+                      paddingAngle={4}
+                      label={({ subject, avgScore }) =>
+                        `${subject} (${avgScore}%)`
+                      }
+                    >
+                      {dashboardData.subjectPerformance.map((_, index) => (
+                        <Cell
+                          key={index}
+                          fill={COLORS[index % COLORS.length]}
+                        />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                    <Legend />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+
+              {/* PERFORMANCE STATS */}
+              <div className="space-y-4">
+                <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-blue-600 font-medium">Best Subject</p>
+                      <p className="text-xl font-bold text-blue-800">
+                        {dashboardData.subjectPerformance.reduce((best, current) => 
+                          current.avgScore > best.avgScore ? current : best
+                        ).subject}
+                      </p>
+                    </div>
+                    <div className="text-3xl text-blue-500">🏆</div>
+                  </div>
+                </div>
+
+                <div className="p-4 bg-green-50 rounded-lg border border-green-200">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-green-600 font-medium">Pass Rate</p>
+                      <p className="text-xl font-bold text-green-800">
+                        {Math.round(
+                          dashboardData.subjectPerformance.filter(s => s.avgScore >= 40).length / 
+                          dashboardData.subjectPerformance.length * 100
+                        )}%
+                      </p>
+                    </div>
+                    <div className="text-3xl text-green-500">✅</div>
+                  </div>
+                </div>
+
+                <div className="p-4 bg-purple-50 rounded-lg border border-purple-200">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-purple-600 font-medium">Avg Score</p>
+                      <p className="text-xl font-bold text-purple-800">
+                        {Math.round(
+                          dashboardData.subjectPerformance.reduce((sum, s) => sum + s.avgScore, 0) / 
+                          dashboardData.subjectPerformance.length
+                        )}%
+                      </p>
+                    </div>
+                    <div className="text-3xl text-purple-500">📊</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </Card>
       </div>
 
-      {/* Recent Activity */}
-      <Card className="p-6 border border-border">
-        <div className="space-y-6">
-          <h2 className="text-lg font-semibold text-foreground">Recent Exam Activity</h2>
-          <div className="space-y-4">
-            {scheduleData.map((activity, index) => (
-              <div key={index} className="flex items-center justify-between py-4 border-b border-border last:border-0">
-                <div>
-                  <p className="font-medium text-foreground">{activity.title}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {activity.date} • {activity.students} students
-                  </p>
-                </div>
-                <span className={`text-xs font-semibold px-3 py-1 rounded-full ${
-                  activity.status === 'completed'
-                    ? 'bg-green-100 text-green-700'
-                    : 'bg-blue-100 text-blue-700'
-                }`}>
-                  {activity.status === 'completed' ? 'Completed' : 'Upcoming'}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </Card>
-
-      {/* Quick Actions */}
+      {/* QUICK ACTIONS */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Button className="h-12 bg-primary hover:bg-primary/90 text-base">
+        <Button
+          onClick={() => router.push('/faculty/create-exam')}
+          className="h-12"
+        >
           Create New Exam
         </Button>
-        <Button variant="outline" className="h-12 text-base bg-transparent">
+
+        <Button
+          onClick={() => router.push('/faculty/material-upload')}
+          variant="outline"
+          className="h-12"
+        >
           Upload Materials
         </Button>
-        <Button variant="outline" className="h-12 text-base bg-transparent">
+
+        <Button
+          onClick={() => router.push('/faculty/view-students')}
+          variant="outline"
+          className="h-12"
+        >
           View All Students
         </Button>
       </div>

@@ -1,0 +1,101 @@
+// models/QuizAttempt.js
+import mongoose from "mongoose";
+
+const quizAttemptSchema = new mongoose.Schema(
+  {
+    student: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+
+    quizType: {
+      type: String,
+      enum: ["CUSTOM", "SCHEDULED"],
+      required: true,
+    },
+
+    quizId: {
+      type: String,
+    },
+
+    questions: [
+      {
+        questionId: { type: String, required: true },
+        question: { type: String, required: true },
+        options: { type: [String], required: true },
+        correctAnswer: { type: Number, required: true },
+        topic: { type: String },
+      },
+    ],
+
+    correctAnswers: [
+      {
+        questionId: { type: String, required: true },
+        correctAnswer: { type: Number, required: true },
+        question: { type: String, default: "" },
+        options: { type: [String], default: [] },
+        topic: { type: String, default: "" },
+      },
+    ],
+
+    answers: [
+      {
+        questionId: { type: String, required: true },
+        selectedIndex: { type: Number, default: null },
+      },
+    ],
+
+    totalQuestions: { type: Number, default: 0 },
+
+    warnings: {
+      tab: { type: Number, default: 0 },
+      face: { type: Number, default: 0 },
+    },
+
+    score: { type: Number, default: 0 },
+
+    status: {
+      type: String,
+      enum: ["ONGOING", "SUBMITTED", "AUTO_SUBMITTED"],
+      default: "ONGOING",
+    },
+
+    submittedAt: Date,
+
+    // 🔒 MOST IMPORTANT
+    isFinalized: {
+      type: Boolean,
+      default: false,
+    },
+
+    examId: {
+  type: mongoose.Schema.Types.ObjectId,
+  ref: "Exam",
+},
+
+noFaceSince: {
+  type: Date,
+  default: null,
+},
+
+    lastFaceWarningAt: {
+      type: Date,
+      default: null,
+    },
+
+    submissionType: {
+      type: String,
+      enum: ["MANUAL", "AUTO", "TIME_UP"],
+    },
+
+    submitReason: {
+      type: String,
+      enum: ["NORMAL", "TIME_UP", "PROCTOR_VIOLATION"],
+    },
+  },
+  { timestamps: true }
+);
+
+
+export default mongoose.model("QuizAttempt", quizAttemptSchema);
