@@ -40,7 +40,7 @@ const menuItems = [
     href: '/student/interview',
   },
   {
-    label: 'Certifications',
+    label: 'Courses',
     icon: Award,
     href: '/student/certifications',
   },

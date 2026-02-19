@@ -1,235 +1,273 @@
-'use client'
+"use client";
 
-import { useState } from 'react'
-import { Card } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Calendar, Clock, Plus, X } from 'lucide-react'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
+import { useState, useEffect } from "react";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useRouter } from "next/navigation";
 
-const scheduledSessions = [
-  {
-    id: 1,
-    student: 'John Doe',
-    date: 'March 20, 2024',
-    time: '10:00 AM',
-    topic: 'English Speaking',
-    duration: '30 min',
-  },
-  {
-    id: 2,
-    student: 'Jane Smith',
-    date: 'March 20, 2024',
-    time: '11:00 AM',
-    topic: 'English Speaking',
-    duration: '30 min',
-  },
-  {
-    id: 3,
-    student: 'Bob Johnson',
-    date: 'March 21, 2024',
-    time: '2:00 PM',
-    topic: 'Spanish Conversation',
-    duration: '45 min',
-  },
-]
+export default function FacultyOralPage() {
+  const API = process.env.NEXT_PUBLIC_API_URL;
+  const router = useRouter();
 
-export default function OralSchedulePage() {
-  const [showScheduleModal, setShowScheduleModal] = useState(false)
-  const [formData, setFormData] = useState({
-    studentName: '',
-    date: '',
-    time: '',
-    topic: '',
-    duration: '30'
-  })
+  const [form, setForm] = useState({
+    topic: "",
+    date: "",
+    time: "",
+    duration: "10",
+  });
 
-  const handleScheduleClick = () => {
-    setShowScheduleModal(true)
-  }
+  const [exam, setExam] = useState<any>(null);
+  const [scheduledExams, setScheduledExams] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
 
-  const handleScheduleSubmit = () => {
-    if (formData.studentName && formData.date && formData.time && formData.topic) {
-      alert(`Oral exam scheduled successfully!\nStudent: ${formData.studentName}\nDate: ${formData.date}\nTime: ${formData.time}`)
-      setShowScheduleModal(false)
-      setFormData({ studentName: '', date: '', time: '', topic: '', duration: '30' })
-    }
-  }
+  /* ================= FETCH SCHEDULED ================= */
 
-  const handleModalClose = () => {
-    setShowScheduleModal(false)
-    setFormData({ studentName: '', date: '', time: '', topic: '', duration: '30' })
-  }
+  const fetchScheduled = async () => {
+    const res = await fetch(`${API}/faculty/oral`, {
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem("token")}`,
+      },
+    });
+
+    const data = await res.json();
+    setScheduledExams(data);
+  };
+
+  useEffect(() => {
+    fetchScheduled();
+  }, []);
+
+  /* ================= GENERATE ================= */
+
+  const handleGenerate = async () => {
+    setLoading(true);
+
+    const res = await fetch(`${API}/faculty/oral/generate`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${localStorage.getItem("token")}`,
+      },
+      body: JSON.stringify({
+        ...form,
+        duration: Number(form.duration),
+      }),
+    });
+
+    const data = await res.json();
+    setExam(data);
+    setLoading(false);
+  };
+
+  /* ================= UPDATE QUESTION ================= */
+
+  const updateQuestion = (index: number, field: string, value: string) => {
+    const updated = [...exam.questions];
+    updated[index][field] = value;
+    setExam({ ...exam, questions: updated });
+  };
+
+  const deleteQuestion = (index: number) => {
+    const updated = exam.questions.filter((_: any, i: number) => i !== index);
+    setExam({ ...exam, questions: updated });
+  };
+
+  const addQuestion = () => {
+    if (exam.questions.length >= exam.totalQuestions) return;
+
+    setExam({
+      ...exam,
+      questions: [...exam.questions, { question: "", expectedAnswer: "" }],
+    });
+  };
+
+  /* ================= SAVE ================= */
+
+  const saveExam = async () => {
+    await fetch(`${API}/faculty/oral/${exam._id}`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${localStorage.getItem("token")}`,
+      },
+      body: JSON.stringify({
+        questions: exam.questions,
+      }),
+    });
+
+    alert("Saved successfully!");
+  };
+
+  /* ================= ASSIGN ================= */
+
+  const assignExam = async () => {
+    await fetch(`${API}/faculty/oral/${exam._id}/assign`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem("token")}`,
+      },
+    });
+
+    alert("Assigned successfully!");
+    setExam(null);
+    fetchScheduled();
+  };
+
+  /* ================= DELETE SCHEDULED ================= */
+
+  const deleteExam = async (id: string) => {
+    await fetch(`${API}/faculty/oral/${id}`, {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem("token")}`,
+      },
+    });
+
+    fetchScheduled();
+  };
 
   return (
-    <div className="p-8 space-y-8">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground">Oral Exam Schedule</h1>
-          <p className="text-muted-foreground mt-2">Schedule oral practice sessions with students</p>
-        </div>
-        <Button 
-          onClick={handleScheduleClick}
-          className="gap-2 bg-primary hover:bg-primary/90"
-        >
-          <Plus className="w-4 h-4" />
-          Schedule Session
-        </Button>
-      </div>
+    <div className="p-8 space-y-10">
+      {/* CREATE SECTION */}
+      {!exam && (
+        <Card className="p-6 space-y-4">
+          <Input
+            placeholder="Topic"
+            value={form.topic}
+            onChange={(e) => setForm({ ...form, topic: e.target.value })}
+          />
 
-      {/* Scheduled Sessions Table */}
-      <Card className="p-6 border border-border overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-border">
-              <th className="text-left py-3 font-semibold text-foreground">Student</th>
-              <th className="text-left py-3 font-semibold text-foreground">Date</th>
-              <th className="text-left py-3 font-semibold text-foreground">Time</th>
-              <th className="text-left py-3 font-semibold text-foreground">Topic</th>
-              <th className="text-left py-3 font-semibold text-foreground">Duration</th>
-              <th className="text-left py-3 font-semibold text-foreground">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {scheduledSessions.map((session) => (
-              <tr key={session.id} className="border-b border-border hover:bg-secondary/30 transition-colors">
-                <td className="py-3 text-foreground">{session.student}</td>
-                <td className="py-3 text-muted-foreground">{session.date}</td>
-                <td className="py-3 text-muted-foreground">{session.time}</td>
-                <td className="py-3 text-muted-foreground">{session.topic}</td>
-                <td className="py-3 text-muted-foreground">{session.duration}</td>
-                <td className="py-3 space-x-2">
-                  <Button variant="outline" size="sm">Edit</Button>
-                  <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700 bg-transparent">Delete</Button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </Card>
+          <Input
+            type="date"
+            value={form.date}
+            onChange={(e) => setForm({ ...form, date: e.target.value })}
+          />
 
-      {/* Schedule Modal */}
-      {showScheduleModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <Card className="w-full max-w-md p-8 border border-border">
-            <div className="space-y-6">
-              <div className="flex justify-between items-center">
-                <h2 className="text-2xl font-bold text-foreground">Schedule Oral Session</h2>
-                <button 
-                  onClick={handleModalClose}
-                  className="text-2xl text-muted-foreground hover:text-foreground"
-                >
-                  <X className="w-6 h-6" />
-                </button>
+          <Input
+            type="time"
+            value={form.time}
+            onChange={(e) => setForm({ ...form, time: e.target.value })}
+          />
+
+          <select
+            value={form.duration}
+            onChange={(e) => setForm({ ...form, duration: e.target.value })}
+            className="border p-2 rounded"
+          >
+            <option value="10">10 min</option>
+            <option value="20">20 min</option>
+            <option value="30">30 min</option>
+            <option value="60">60 min</option>
+          </select>
+
+          <Button onClick={handleGenerate}>
+            {loading ? "Generating..." : "Generate Oral"}
+          </Button>
+        </Card>
+      )}
+
+      {/* EDIT SECTION */}
+      {exam && (
+        <div className="space-y-6">
+          {exam.questions.map((q: any, i: number) => (
+            <Card key={i} className="p-6 space-y-4">
+              <div>
+                <Label>Question</Label>
+                <Input
+                  disabled={editingIndex !== i}
+                  value={q.question}
+                  onChange={(e) =>
+                    updateQuestion(i, "question", e.target.value)
+                  }
+                />
               </div>
 
-              <div className="space-y-4">
-                {/* Student Name */}
-                <div className="space-y-2">
-                  <Label htmlFor="studentName" className="text-sm font-medium text-foreground">
-                    Student Name
-                  </Label>
-                  <Input
-                    id="studentName"
-                    placeholder="Enter student name"
-                    value={formData.studentName}
-                    onChange={(e) => setFormData({...formData, studentName: e.target.value})}
-                    className="h-10 border-border bg-background"
-                  />
-                </div>
-
-                {/* Date Picker */}
-                <div className="space-y-2">
-                  <Label htmlFor="date" className="text-sm font-medium text-foreground">
-                    Date
-                  </Label>
-                  <Input
-                    id="date"
-                    type="date"
-                    value={formData.date}
-                    onChange={(e) => setFormData({...formData, date: e.target.value})}
-                    className="h-10 border-border bg-background"
-                  />
-                </div>
-
-                {/* Time Selector */}
-                <div className="space-y-2">
-                  <Label htmlFor="time" className="text-sm font-medium text-foreground">
-                    Time
-                  </Label>
-                  <Input
-                    id="time"
-                    type="time"
-                    value={formData.time}
-                    onChange={(e) => setFormData({...formData, time: e.target.value})}
-                    className="h-10 border-border bg-background"
-                  />
-                </div>
-
-                {/* Topic Selection */}
-                <div className="space-y-2">
-                  <Label htmlFor="topic" className="text-sm font-medium text-foreground">
-                    Examination Topic
-                  </Label>
-                  <Select value={formData.topic} onValueChange={(value) => setFormData({...formData, topic: value})}>
-                    <SelectTrigger className="h-10 border-border bg-background">
-                      <SelectValue placeholder="Select topic" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="English Speaking">English Speaking</SelectItem>
-                      <SelectItem value="Spanish Conversation">Spanish Conversation</SelectItem>
-                      <SelectItem value="French Speaking">French Speaking</SelectItem>
-                      <SelectItem value="Interview Skills">Interview Skills</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Duration */}
-                <div className="space-y-2">
-                  <Label htmlFor="duration" className="text-sm font-medium text-foreground">
-                    Duration (minutes)
-                  </Label>
-                  <Select value={formData.duration} onValueChange={(value) => setFormData({...formData, duration: value})}>
-                    <SelectTrigger className="h-10 border-border bg-background">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="15">15 minutes</SelectItem>
-                      <SelectItem value="30">30 minutes</SelectItem>
-                      <SelectItem value="45">45 minutes</SelectItem>
-                      <SelectItem value="60">60 minutes</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+              <div>
+                <Label>Expected Answer</Label>
+                <Input
+                  disabled={editingIndex !== i}
+                  value={q.expectedAnswer}
+                  onChange={(e) =>
+                    updateQuestion(i, "expectedAnswer", e.target.value)
+                  }
+                />
               </div>
 
-              <div className="flex gap-3 pt-4">
-                <Button 
-                  onClick={handleScheduleSubmit}
-                  className="flex-1 bg-primary hover:bg-primary/90"
+              <div className="flex gap-3">
+                <Button
+                  onClick={() => setEditingIndex(editingIndex === i ? null : i)}
                 >
-                  Schedule Exam
+                  {editingIndex === i ? "Done" : "Edit"}
                 </Button>
-                <Button 
-                  onClick={handleModalClose}
-                  variant="outline" 
-                  className="flex-1 bg-transparent"
-                >
-                  Cancel
+
+                <Button variant="destructive" onClick={() => deleteQuestion(i)}>
+                  Delete
                 </Button>
               </div>
-            </div>
-          </Card>
+            </Card>
+          ))}
+
+          <Button
+            onClick={addQuestion}
+            disabled={exam.questions.length >= exam.totalQuestions}
+          >
+            Add Question
+          </Button>
+
+          <div className="flex gap-4">
+            <Button onClick={saveExam}>Save Changes</Button>
+            <Button onClick={assignExam}>Assign to Students</Button>
+          </div>
         </div>
       )}
+
+      {/* SCHEDULED TESTS */}
+      <div className="space-y-6 border-t pt-8">
+        <h2 className="text-xl font-semibold">Scheduled Tests</h2>
+
+        {scheduledExams.length === 0 ? (
+          <Card className="p-6 text-center">No tests scheduled</Card>
+        ) : (
+          scheduledExams.map((exam) => (
+            <Card
+              key={exam._id}
+              className="p-6 flex justify-between items-center"
+            >
+              <div>
+                <h3 className="font-semibold">{exam.topic}</h3>
+                <p className="text-sm text-muted-foreground">
+                  {new Date(exam.date).toLocaleDateString("en-IN", {
+                    day: "numeric",
+                    month: "long",
+                    year: "numeric",
+                  })}{" "}
+                  • {exam.time} • {exam.duration} mins
+                </p>
+              </div>
+
+              <div className="flex gap-3">
+                <Button
+                  onClick={() =>
+                    router.push(`/faculty/oral-schedule/${exam._id}`)
+                  }
+                >
+                  View
+                </Button>
+
+                <Button
+                  variant="destructive"
+                  onClick={() => deleteExam(exam._id)}
+                >
+                  Delete
+                </Button>
+              </div>
+            </Card>
+          ))
+        )}
+      </div>
     </div>
-  )
+  );
 }

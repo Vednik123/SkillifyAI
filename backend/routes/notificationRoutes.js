@@ -12,4 +12,33 @@ router.get("/", protect, async (req, res) => {
   res.json(notifications);
 });
 
+
+// ORAL ROUTES
+router.put("/:id/read", protect, async (req, res) => {
+  await Notification.findByIdAndUpdate(req.params.id, {
+    read: true,
+  });
+
+  res.json({ message: "Marked as read" });
+});
+
+
+router.delete("/:id", protect, async (req, res) => {
+  await Notification.findByIdAndDelete(req.params.id);
+  res.json({ message: "Deleted successfully" });
+});
+
+router.put("/mark-all", protect, async (req, res) => {
+  await Notification.updateMany(
+    { userId: req.user._id, read: false },
+    { read: true }
+  );
+
+  res.json({ message: "All marked as read" });
+});
+
+
+
 export default router;
+
+

@@ -11,6 +11,13 @@ import notificationRoutes from "./routes/notificationRoutes.js";
 import aiMentorRoutes from "./routes/aiMentorRoutes.js";
 import aiTutorRoutes from "./routes/aiTutorRoutes.js";
 import aiRoutes from "./routes/aiRoutes.js";
+import courseRoutes from "./routes/courseRoutes.js";
+import interviewRoutes from "./routes/interviewRoutes.js";
+import oralRoutes from "./routes/oralRoutes.js";
+import facultyOralRoutes from "./routes/facultyOralRoutes.js";
+import facultyOralStudentRoutes from "./routes/facultyOralStudentRoutes.js";
+import userRoutes from "./routes/userRoutes.js";
+import facultyAnalyticsRoutes from "./routes/facultyAnalyticsRoutes.js";
 
 
 
@@ -43,16 +50,22 @@ app.get("/", (req, res) => {
 
 app.use("/uploads", express.static("uploads"));
 
+
 app.use("/api/auth", authRoutes);
 app.use("/api/student", studentRoutes);
 app.use("/api/faculty", facultyRoutes);
 app.use("/api/parent", parentRoutes);
 app.use("/api", aiRoutes);
-
-
+app.use("/api/courses", courseRoutes);
 app.use("/api/ai-mentor", aiMentorRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/ai-tutor", aiTutorRoutes);
+app.use("/api/interviews", interviewRoutes);
+app.use("/api/oral", oralRoutes);
+app.use("/api/faculty/oral", facultyOralRoutes);
+app.use("/api/student/faculty-oral", facultyOralStudentRoutes);
+app.use("/api/user", userRoutes);
+app.use("/api/faculty/analytics", facultyAnalyticsRoutes);
 
 
 // ✅ Server start

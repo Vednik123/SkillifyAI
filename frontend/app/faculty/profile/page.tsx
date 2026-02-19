@@ -76,7 +76,7 @@ export default function FacultyProfile() {
                 Faculty ID
               </p>
               <p className="text-xl font-semibold text-gray-900 tracking-tight">
-                FAC-830386
+                {formData.facultyId || "N/A"}
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -116,7 +116,7 @@ export default function FacultyProfile() {
             </Label>
             <div className={`text-base font-semibold ${!isEditing ? 'text-gray-900' : ''}`}>
               {!isEditing ? (
-                <p className="text-gray-900 font-medium text-lg">Vedant</p>
+                <p className="text-gray-900 font-medium text-lg">{formData.fullName}</p>
               ) : (
                 <Input
                   value={formData.fullName}
@@ -139,7 +139,7 @@ export default function FacultyProfile() {
             </Label>
             <div className={`text-base font-semibold ${!isEditing ? 'text-gray-900' : ''}`}>
               {!isEditing ? (
-                <p className="text-gray-900 font-medium text-lg">vedant@gmail.com</p>
+                <p className="text-gray-900 font-medium text-lg">{formData.email || 'N/A'}</p>
               ) : (
                 <Input
                   value={formData.email}
@@ -162,7 +162,7 @@ export default function FacultyProfile() {
             </Label>
             <div className={`text-base font-semibold ${!isEditing ? 'text-gray-900' : ''}`}>
               {!isEditing ? (
-                <p className="text-gray-900 font-medium text-lg">8379086169</p>
+                <p className="text-gray-900 font-medium text-lg">{formData.phone}</p>
               ) : (
                 <Input
                   value={formData.phone}
