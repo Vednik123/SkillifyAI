@@ -172,13 +172,46 @@ export const getUserOralSessions = async (req, res) => {
 };
 
 export const getStudentScheduledExams = async (req, res) => {
-  const exams = await FacultyOralExam.find({
-    assignedStudents: req.user._id,
-    status: "assigned",
-  })
-  .populate("faculty", "fullName email") 
-  .sort({ createdAt: -1 });
+  try {
+    const studentId = req.user._id;
 
-  res.json(exams);
+    // Get all classes the student belongs to
+    const Class = await import("../models/Class.js").then(m => m.default);
+    const studentClasses = await Class.find({ 
+      "students": studentId 
+    }).select("_id");
+
+    const classIds = studentClasses.map(cls => cls._id);
+
+    const exams = await FacultyOralExam.find({
+      status: "assigned",
+      $or: [
+        { scope: "ALL" },
+        {
+          scope: "SELECTED",
+          assignedStudents: { $in: [studentId] },
+        },
+        {
+          scope: "CLASS",
+          assignedClass: { $in: classIds },
+        },
+      ],
+    })
+    .populate("faculty", "fullName email") 
+    .sort({ createdAt: -1 });
+
+    console.log(`Found ${exams.length} scheduled oral exams for student ${studentId}`);
+    console.log("Student class IDs:", classIds);
+    console.log("Oral exams found:", exams.map(e => ({ 
+      id: e._id, 
+      topic: e.topic, 
+      scope: e.scope, 
+      assignedClass: e.assignedClass 
+    })));
+
+    res.json(exams);
+  } catch (error) {
+    console.error("❌ Fetch scheduled oral exams error:", error);
+    res.status(500).json({ message: "Failed to fetch scheduled oral exams" });
+  }
 };
-

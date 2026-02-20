@@ -34,7 +34,7 @@ const examSchema = new mongoose.Schema({
   // ⭐⭐ PERMANENT FIX ⭐⭐
   scope: {
     type: String,
-    enum: ["ALL", "SELECTED"],
+    enum: ["ALL", "SELECTED", "CLASS"],
     default: "ALL",     // 🔥 NEVER missing now
   },
 
@@ -42,6 +42,11 @@ const examSchema = new mongoose.Schema({
     type: [mongoose.Schema.Types.ObjectId],
     ref: "User",
     default: [],        // 🔥 NEVER undefined
+  },
+
+  assignedClass: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Class",
   },
 
   scheduledAt: Date,

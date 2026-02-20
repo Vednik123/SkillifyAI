@@ -36,11 +36,11 @@ const [editCorrect, setEditCorrect] = useState<number>(0)
 const [examApproved, setExamApproved] = useState(false)
 const [showSchedule, setShowSchedule] = useState(false)
 const [showAssign, setShowAssign] = useState(false)
-const [assignType, setAssignType] = useState<'ALL' | 'SELECTED'>('ALL')
+const [assignType, setAssignType] = useState<'ALL' | 'SELECTED' | 'CLASS'>('ALL')
 const [students, setStudents] = useState<any[]>([])
 const [selectedStudents, setSelectedStudents] = useState<string[]>([])
-
-
+const [classes, setClasses] = useState<any[]>([])
+const [selectedClass, setSelectedClass] = useState<string>('')
 
   // Sample generated questions
   // const sampleQuestions = [
@@ -267,27 +267,53 @@ const fetchStudents = async () => {
   }
 }
 
+const fetchClasses = async () => {
+  try {
+    const res = await fetch(
+      "http://localhost:5000/api/faculty/classes",
+      {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      }
+    )
+
+    const data = await res.json()
+    setClasses(data)
+  } catch (err) {
+    alert("Failed to load classes")
+  }
+}
+
 const handleAssignStudents = async () => {
   if (!examId) return
 
   try {
+    const requestBody: any = {
+      scope: assignType,
+    }
+
+    if (assignType === "SELECTED") {
+      requestBody.studentIds = selectedStudents
+    } else if (assignType === "CLASS") {
+      requestBody.assignedClass = selectedClass
+    }
+
     await fetch(
       `http://localhost:5000/api/faculty/exams/${examId}/assign`,
       {
-        method: "POST",
+        method: "PATCH",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
-        body: JSON.stringify({
-          assignType,
-          studentIds: selectedStudents,
-        }),
+        body: JSON.stringify(requestBody),
       }
     )
 
     alert("Exam assigned successfully")
     setSelectedStudents([])
+    setSelectedClass('')
     setShowAssign(false)
   } catch {
     alert("Failed to assign exam")
@@ -513,7 +539,7 @@ const handleAssignStudents = async () => {
       {editOptions.map((opt, idx) => (
         <div key={idx} className="flex gap-2 items-center">
           <input
-            type="radio"
+            type="radio"  
             checked={editCorrect === idx}
             onChange={() => setEditCorrect(idx)}
           />
@@ -627,6 +653,7 @@ const handleAssignStudents = async () => {
       onClick={() => {
         setShowAssign(true)
         fetchStudents()
+        fetchClasses()
       }}
       className="flex-1 bg-purple-600"
     >
@@ -702,7 +729,7 @@ const handleAssignStudents = async () => {
 
       <Select
   value={assignType}
-  onValueChange={(v) => setAssignType(v as 'ALL' | 'SELECTED')}
+  onValueChange={(v) => setAssignType(v as 'ALL' | 'SELECTED' | 'CLASS')}
 >
         <SelectTrigger>
           <SelectValue />
@@ -710,6 +737,7 @@ const handleAssignStudents = async () => {
         <SelectContent>
           <SelectItem value="ALL">All Students</SelectItem>
           <SelectItem value="SELECTED">Selected Students</SelectItem>
+          <SelectItem value="CLASS">Assign to Class</SelectItem>
         </SelectContent>
       </Select>
 
@@ -731,6 +759,24 @@ const handleAssignStudents = async () => {
               {s.name} ({s.email})
             </label>
           ))}
+        </div>
+      )}
+
+      {assignType === "CLASS" && (
+        <div className="space-y-2 border p-2 rounded">
+          <label className="block text-sm font-medium mb-2">Select Class</label>
+          <select
+            value={selectedClass}
+            onChange={(e) => setSelectedClass(e.target.value)}
+            className="w-full p-2 border rounded"
+          >
+            <option value="">Select a class</option>
+            {classes.map((cls) => (
+              <option key={cls._id} value={cls._id}>
+                {cls.name} ({cls.students?.length || 0} students)
+              </option>
+            ))}
+          </select>
         </div>
       )}
 

@@ -2,6 +2,32 @@ import FacultyOralExam from "../models/FacultyOralExam.js";
 import FacultyOralAttempt from "../models/FacultyOralAttempt.js";
 import { getGeminiModel } from "../utils/gemini.js";
 
+// Fallback manual evaluation function
+const evaluateAnswerManually = (studentAnswer, expectedAnswer) => {
+  if (!studentAnswer || !expectedAnswer) return 0;
+  
+  const studentLower = studentAnswer.toLowerCase().trim();
+  const expectedLower = expectedAnswer.toLowerCase().trim();
+  
+  // Exact match
+  if (studentLower === expectedLower) return 10;
+  
+  // Partial match based on keywords
+  const studentWords = studentLower.split(/\s+/);
+  const expectedWords = expectedLower.split(/\s+/);
+  
+  const commonWords = studentWords.filter(word => expectedWords.includes(word));
+  const similarity = commonWords.length / Math.max(studentWords.length, expectedWords.length);
+  
+  // Score based on similarity
+  if (similarity >= 0.8) return 8;
+  if (similarity >= 0.6) return 6;
+  if (similarity >= 0.4) return 4;
+  if (similarity >= 0.2) return 2;
+  
+  return 1; // At least 1 point for attempting
+};
+
 export const startFacultyExam = async (req, res) => {
   const exam = await FacultyOralExam.findById(req.params.id);
 
@@ -56,46 +82,47 @@ export const submitFacultyAnswer = async (req, res) => {
 };
 
 export const evaluateFacultyExam = async (req, res) => {
-  const { attemptId } = req.body;
+  try {
+    const { attemptId } = req.body;
 
-  const attempt = await FacultyOralAttempt.findById(attemptId)
-    .populate("exam");
+    const attempt = await FacultyOralAttempt.findById(attemptId)
+      .populate("exam");
 
-  if (!attempt) {
-    return res.status(404).json({ message: "Attempt not found" });
-  }
-
-  const gemini = getGeminiModel();
-
-  let totalScore = 0;
-  const totalQuestions = attempt.exam.totalQuestions;
-
-  for (let i = 0; i < totalQuestions; i++) {
-    let ans = attempt.answers.find(
-      (a) => a.questionIndex === i
-    );
-
-    const question = attempt.exam.questions[i];
-
-    // If not answered → assign 0
-    if (!ans || !ans.studentAnswer) {
-      if (!ans) {
-        attempt.answers.push({
-          questionIndex: i,
-          studentAnswer: "",
-          score: 0,
-          aiFeedback: "Not Attempted",
-        });
-      } else {
-        ans.score = 0;
-        ans.aiFeedback = "Not Attempted";
-      }
-
-      continue;
+    if (!attempt) {
+      return res.status(404).json({ message: "Attempt not found" });
     }
 
-    // 🔥 Evaluate answered questions
-    const prompt = `
+    const gemini = getGeminiModel();
+
+    let totalScore = 0;
+    const totalQuestions = attempt.exam.totalQuestions;
+
+    for (let i = 0; i < totalQuestions; i++) {
+      let ans = attempt.answers.find(
+        (a) => a.questionIndex === i
+      );
+
+      const question = attempt.exam.questions[i];
+
+      // If not answered → assign 0
+      if (!ans || !ans.studentAnswer) {
+        if (!ans) {
+          attempt.answers.push({
+            questionIndex: i,
+            studentAnswer: "",
+            score: 0,
+            aiFeedback: "Not Attempted",
+          });
+        } else {
+          ans.score = 0;
+          ans.aiFeedback = "Not Attempted";
+        }
+
+        continue;
+      }
+
+      // 🔥 Evaluate answered questions
+      const prompt = `
 Question: ${question.question}
 Expected Answer: ${question.expectedAnswer}
 Student Answer: ${ans.studentAnswer}
@@ -108,34 +135,48 @@ Score: X
 Feedback: ...
 `;
 
-    const result = await gemini.generateContent(prompt);
-    const text = result.response.text();
+      try {
+        const result = await gemini.generateContent(prompt);
+        const text = result.response.text();
 
-    const scoreMatch = text.match(/Score:\s*(\d+)/);
-    const score = scoreMatch ? parseInt(scoreMatch[1]) : 5;
+        const scoreMatch = text.match(/Score:\s*(\d+)/);
+        const score = scoreMatch ? parseInt(scoreMatch[1]) : 5;
 
-    ans.score = score;
-    ans.aiFeedback = text;
+        ans.score = score;
+        ans.aiFeedback = text;
 
-    totalScore += score;
+        totalScore += score;
+      } catch (aiError) {
+        console.error("AI evaluation failed:", aiError.message);
+        
+        // Fallback scoring if AI fails
+        const fallbackScore = evaluateAnswerManually(ans.studentAnswer, question.expectedAnswer);
+        ans.score = fallbackScore;
+        ans.aiFeedback = `AI evaluation unavailable. Manual score: ${fallbackScore}/10`;
+        
+        totalScore += fallbackScore;
+      }
+    }
+
+    // ✅ Correct calculation out of full paper
+    attempt.overallScore = Math.round(
+      (totalScore / (totalQuestions * 10)) * 100
+    );
+
+    attempt.aiSummary = `Overall Performance: ${
+      attempt.overallScore > 75 ? "Excellent" : "Needs Improvement"
+    }`;
+
+    attempt.status = "completed";
+
+    await attempt.save();
+
+    res.json({ message: "Evaluation complete" });
+  } catch (error) {
+    console.error("Evaluation error:", error);
+    res.status(500).json({ message: "Evaluation failed" });
   }
-
-  // ✅ Correct calculation out of full paper
-  attempt.overallScore = Math.round(
-    (totalScore / (totalQuestions * 10)) * 100
-  );
-
-  attempt.aiSummary = `Overall Performance: ${
-    attempt.overallScore > 75 ? "Excellent" : "Needs Improvement"
-  }`;
-
-  attempt.status = "completed";
-
-  await attempt.save();
-
-  res.json({ message: "Evaluation complete" });
 };
-
 
 export const getFacultyResult = async (req, res) => {
   try {
@@ -169,4 +210,3 @@ export const getStudentFacultyAttempts = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
-

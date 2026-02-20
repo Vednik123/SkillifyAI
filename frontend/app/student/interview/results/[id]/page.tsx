@@ -175,12 +175,12 @@ export default function InterviewResultsPage() {
             <div className="w-full bg-border rounded-full h-3">
               <div
                 className="bg-primary h-3 rounded-full"
-                style={{ width: `${value * 10}%` }}
+                style={{ width: `${value}%` }}
               />
             </div>
 
             <p className="text-sm text-muted-foreground">
-              Score: {value}/10
+              Score: {value/10}/10
             </p>
           </Card>
         ))}

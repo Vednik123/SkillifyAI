@@ -4,19 +4,30 @@ import cloudinary from "../config/cloudinary.js";
 
 export const uploadMaterial = async (req, res) => {
   try {
-    const { title, description, sendType, selectedStudents } = req.body;
+    const { title, description, sendType, selectedStudents, assignedClass } = req.body;
 
     if (!req.files || req.files.length === 0) {
       return res.status(400).json({ message: "No files uploaded" });
     }
 
     let studentsList = [];
+    let classId = null;
 
     if (sendType === "ALL") {
       const faculty = await User.findById(req.user._id);
       studentsList = faculty.students;
     } else if (sendType === "SELECTED" && selectedStudents) {
       studentsList = JSON.parse(selectedStudents);
+    } else if (sendType === "CLASS" && assignedClass) {
+      const Class = await import("../models/Class.js").then(m => m.default);
+      const classDoc = await Class.findById(assignedClass).populate("students");
+      
+      if (!classDoc) {
+        return res.status(404).json({ message: "Class not found" });
+      }
+      
+      studentsList = classDoc.students.map(s => s._id);
+      classId = assignedClass;
     }
 
     const materials = [];
@@ -50,7 +61,9 @@ const stream = cloudinary.uploader.upload_stream(
   filePath: result.secure_url,   // keep for preview
   publicId: result.public_id,    // ✅ SAVE STRING ONLY
   faculty: req.user._id,
+  scope: sendType,
   students: studentsList,
+  assignedClass: classId,
 });
 
       

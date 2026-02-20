@@ -87,6 +87,7 @@ export const updateFacultyOral = async (req, res) => {
 
 export const assignFacultyOral = async (req, res) => {
   try {
+    const { scope, selectedStudents = [], assignedClass } = req.body;
     const exam = await FacultyOralExam.findById(req.params.id).populate("faculty", "fullName email");
 
     if (!exam) {
@@ -99,11 +100,35 @@ export const assignFacultyOral = async (req, res) => {
       return res.status(404).json({ message: "Faculty not found" });
     }
 
-    const students = await User.find({
-      _id: { $in: faculty.students },
-    });
+    exam.scope = scope || "ALL";
 
-    exam.assignedStudents = faculty.students;
+    let students = [];
+    
+    if (scope === "SELECTED") {
+      students = await User.find({
+        _id: { $in: selectedStudents },
+      });
+      exam.assignedStudents = selectedStudents;
+      exam.assignedClass = null;
+    } else if (scope === "CLASS") {
+      const Class = await import("../models/Class.js").then(m => m.default);
+      const classDoc = await Class.findById(assignedClass).populate("students");
+      
+      if (!classDoc) {
+        return res.status(404).json({ message: "Class not found" });
+      }
+      
+      students = classDoc.students;
+      exam.assignedStudents = students.map(s => s._id);
+      exam.assignedClass = assignedClass;
+    } else {
+      students = await User.find({
+        _id: { $in: faculty.students },
+      });
+      exam.assignedStudents = faculty.students;
+      exam.assignedClass = null;
+    }
+
     exam.status = "assigned";
     await exam.save();
 
@@ -118,7 +143,6 @@ export const assignFacultyOral = async (req, res) => {
       type: "info",
     }));
 
-    // await Notification.insertMany(notifications);
     for (const student of students) {
       const exists = await Notification.findOne({
         userId: student._id,
@@ -142,33 +166,51 @@ export const assignFacultyOral = async (req, res) => {
 
     /* ================= SEND EMAILS ================= */
 
-    const transporter = nodemailer.createTransport({
-      service: "gmail",
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-      },
-    });
+    // Only send emails if credentials are configured
+    if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+      try {
+        const transporter = nodemailer.createTransport({
+          service: "gmail",
+          auth: {
+            user: process.env.EMAIL_USER,
+            pass: process.env.EMAIL_PASS,
+          },
+        });
 
-    for (const student of students) {
-      await transporter.sendMail({
-        from: process.env.EMAIL_USER,
-        to: student.email,
-        subject: "New Oral Exam Scheduled",
-        html: `
-          <h3>New Oral Exam Assigned</h3>
-          <h3>Faculty - ${exam.faculty?.fullName}</h3>
-          <p>Topic: <b>${exam.topic}</b></p>
-          <p>Date: ${new Date(exam.date).toLocaleDateString()}</p>
-          <p>Time: ${exam.time}</p>
-          <p>Duration: ${exam.duration} minutes</p>
-          <br/>
-          <p>Please login to your dashboard to attempt the exam.</p>
-        `,
-      });
+        for (const student of students) {
+          await transporter.sendMail({
+            from: process.env.EMAIL_USER,
+            to: student.email,
+            subject: "New Oral Exam Scheduled",
+            html: `
+              <h3>New Oral Exam Assigned</h3>
+              <h3>Faculty - ${exam.faculty?.fullName}</h3>
+              <p>Topic: <b>${exam.topic}</b></p>
+              <p>Date: ${new Date(exam.date).toLocaleDateString()}</p>
+              <p>Time: ${exam.time}</p>
+              <p>Duration: ${exam.duration} minutes</p>
+              <br/>
+              <p>Please login to your dashboard to attempt the exam.</p>
+            `,
+          });
+        }
+        console.log(`Emails sent to ${students.length} students`);
+      } catch (emailError) {
+        console.error("Failed to send emails:", emailError);
+        // Don't fail the assignment if emails fail
+      }
+    } else {
+      console.log("Email credentials not configured - skipping email notifications");
     }
 
-    res.json({ message: "Assigned, notifications sent, emails sent" });
+    const emailSent = !!(process.env.EMAIL_USER && process.env.EMAIL_PASS);
+    
+    res.json({ 
+      message: emailSent ? "Assigned, notifications sent, emails sent" : "Assigned, notifications sent",
+      scope: exam.scope,
+      assignedStudentsCount: students.length,
+      emailsSent: emailSent,
+    });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Assign failed" });

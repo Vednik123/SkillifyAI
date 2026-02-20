@@ -189,6 +189,7 @@ export const scheduleExam = async (req, res) => {
       duration,
       scope = "ALL",              // ⭐ DEFAULT
       assignedStudents = [],
+      assignedClass = null,
     } = req.body;
 
     const exam = await Exam.findById(examId);
@@ -199,7 +200,18 @@ export const scheduleExam = async (req, res) => {
     exam.scheduledAt = new Date(scheduledAt);
     exam.duration = duration;
     exam.scope = scope;
-    exam.assignedStudents = scope === "SELECTED" ? assignedStudents : [];
+    
+    if (scope === "SELECTED") {
+      exam.assignedStudents = assignedStudents;
+      exam.assignedClass = null;
+    } else if (scope === "CLASS") {
+      exam.assignedClass = assignedClass;
+      exam.assignedStudents = [];
+    } else {
+      exam.assignedStudents = [];
+      exam.assignedClass = null;
+    }
+    
     exam.status = "SCHEDULED";
 
     await exam.save();
@@ -216,7 +228,7 @@ export const scheduleExam = async (req, res) => {
 -------------------------------------------------- */
 export const assignStudentsToExam = async (req, res) => {
   try {
-    const { scope, studentIds } = req.body;
+    const { scope, studentIds, assignedClass } = req.body;
     const { examId } = req.params;
 
     const exam = await Exam.findOne({
@@ -236,8 +248,13 @@ export const assignStudentsToExam = async (req, res) => {
       exam.assignedStudents = studentIds.filter((id) =>
         faculty.students.some((s) => s.toString() === id.toString())
       );
+      exam.assignedClass = null;
+    } else if (scope === "CLASS") {
+      exam.assignedClass = assignedClass;
+      exam.assignedStudents = [];
     } else {
       exam.assignedStudents = [];
+      exam.assignedClass = null;
     }
 
     await exam.save();
@@ -246,6 +263,7 @@ export const assignStudentsToExam = async (req, res) => {
       success: true,
       scope: exam.scope,
       assignedStudents: exam.assignedStudents,
+      assignedClass: exam.assignedClass,
     });
   } catch {
     res.status(500).json({ message: "Assignment failed" });

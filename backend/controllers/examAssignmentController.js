@@ -5,7 +5,7 @@ import User from "../models/User.js";
 export const assignStudentsToExam = async (req, res) => {
   try {
     const { examId } = req.params;
-    const { assignType, studentIds } = req.body;
+    const { scope, studentIds, assignedClass } = req.body;
 
     const exam = await Exam.findById(examId);
     if (!exam) return res.status(404).json({ message: "Exam not found" });
@@ -16,24 +16,45 @@ export const assignStudentsToExam = async (req, res) => {
 
     let students = [];
 
-    if (assignType === "ALL") {
-      students = await User.find({ role: "student" }).select("_id");
-      students = students.map(s => s._id);
-    } else {
+    if (scope === "ALL") {
+      // Get all students for this faculty
+      const faculty = await User.findById(req.user._id);
+      students = faculty.students || [];
+    } else if (scope === "SELECTED") {
       students = studentIds;
+    } else if (scope === "CLASS") {
+      // Get students from the selected class
+      const Class = await import("../models/Class.js").then(m => m.default);
+      const classDoc = await Class.findById(assignedClass).populate("students");
+      
+      if (!classDoc) {
+        return res.status(404).json({ message: "Class not found" });
+      }
+      
+      students = classDoc.students.map(s => s._id);
     }
+
+    // Update exam with assignment details
+    exam.scope = scope;
+    exam.assignedStudents = students;
+    exam.assignedClass = assignedClass || null;
+    await exam.save();
 
     const assignment = await ExamAssignment.create({
       exam: examId,
       students,
-      assignedBy: req.user.id,
+      assignedBy: req.user._id,
     });
 
     res.json({
       message: "Exam assigned successfully",
       assignmentId: assignment._id,
+      scope: exam.scope,
+      assignedStudents: exam.assignedStudents,
+      assignedClass: exam.assignedClass,
     });
   } catch (err) {
+    console.error("Exam assignment error:", err);
     res.status(500).json({ message: "Assignment failed" });
   }
 };

@@ -10,6 +10,14 @@ export const getScheduledExamsForStudent = async (req, res) => {
   try {
     const studentId = req.user._id;
 
+    // Get all classes the student belongs to
+    const Class = await import("../models/Class.js").then(m => m.default);
+    const studentClasses = await Class.find({ 
+      "students": studentId 
+    }).select("_id");
+
+    const classIds = studentClasses.map(cls => cls._id);
+
     const exams = await Exam.find({
       status: "SCHEDULED",
       $or: [
@@ -18,8 +26,21 @@ export const getScheduledExamsForStudent = async (req, res) => {
           scope: "SELECTED",
           assignedStudents: { $in: [studentId] },
         },
+        {
+          scope: "CLASS",
+          assignedClass: { $in: classIds },
+        },
       ],
     }).populate("faculty", "fullName email");
+
+    console.log(`Found ${exams.length} scheduled exams for student ${studentId}`);
+    console.log("Student class IDs:", classIds);
+    console.log("Exams found:", exams.map(e => ({ 
+      id: e._id, 
+      title: e.title, 
+      scope: e.scope, 
+      assignedClass: e.assignedClass 
+    })));
 
     return res.status(200).json(exams);
   } catch (error) {

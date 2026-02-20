@@ -289,7 +289,40 @@ const lastFaceEventRef = useRef(0)
   return () =>
     document.removeEventListener('fullscreenchange', onFullscreenChange)
 }, [attemptId])
-  /* ================= TAB SWITCH ================= */
+  /* ---------- ALT+TAB PREVENTION ---------- */
+
+  useEffect(() => {
+    if (!attemptId) return
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Block Alt+Tab
+      if (e.altKey && e.key === 'Tab') {
+        e.preventDefault()
+        e.stopPropagation()
+        
+        // Show warning but don't allow tab switch
+        incrementWarning('Alt+Tab blocked - Tab switching not allowed')
+        
+        // Force re-enter fullscreen
+        setTimeout(async () => {
+          try {
+            if (!document.fullscreenElement) {
+              await document.documentElement.requestFullscreen();
+            }
+          } catch (error) {
+            console.log('Re-entry failed:', error);
+          }
+        }, 100)
+        
+        return false
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [attemptId])
 
  useEffect(() => {
   if (!attemptId) return

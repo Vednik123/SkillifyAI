@@ -24,12 +24,23 @@ const materialSchema = new mongoose.Schema(
       required: true,
     },
 
+    scope: {
+      type: String,
+      enum: ["ALL", "SELECTED", "CLASS"],
+      default: "ALL",
+    },
+
     students: [
       {
         type: mongoose.Schema.Types.ObjectId,
         ref: "User",
       },
     ],
+
+    assignedClass: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Class",
+    },
   },
   { timestamps: true }
 );

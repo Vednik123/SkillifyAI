@@ -234,6 +234,25 @@ export default function OralSessionPage() {
       .padStart(2, "0")}`;
   };
 
+  /* ================= AUTO FULLSCREEN ON START ================= */
+
+  useEffect(() => {
+    if (!session) return;
+    
+    // Auto-enter fullscreen when oral exam starts
+    const enterFullscreen = async () => {
+      try {
+        if (!document.fullscreenElement) {
+          await document.documentElement.requestFullscreen();
+        }
+      } catch (error) {
+        console.log('Fullscreen failed:', error);
+      }
+    };
+    
+    enterFullscreen();
+  }, [session]);
+
   /* ================= AI SPEAK ================= */
 
   const speakText = (text: string) => {
@@ -255,7 +274,64 @@ export default function OralSessionPage() {
     }
   }, [session]);
 
-  /* ================= STRONG ESC BLOCK ================= */
+  /* ================= ALT+TAB PREVENTION ================= */
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Block Alt+Tab
+      if (e.altKey && e.key === 'Tab') {
+        e.preventDefault()
+        e.stopPropagation()
+        
+        // Show warning but don't allow tab switch
+        setWarningMessage('⚠️ Alt+Tab blocked - Tab switching not allowed')
+        
+        // Force re-enter fullscreen
+        setTimeout(async () => {
+          try {
+            if (!document.fullscreenElement) {
+              await document.documentElement.requestFullscreen();
+            }
+          } catch (err) {
+            console.log('Re-entry failed:', err);
+          }
+        }, 100)
+        
+        return false
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [])
+
+  useEffect(() => {
+    const handleKeyDown = async (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
+
+        // 🔴 ESC warning
+        setWarningMessage("⚠️ ESC key disabled during exam.");
+        
+        // Force re-enter fullscreen immediately
+        if (!document.fullscreenElement) {
+          try {
+            await document.documentElement.requestFullscreen();
+          } catch (err) {
+            console.log("Re-entry blocked:", err);
+          }
+        }
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
 
   useEffect(() => {
     const handleKeyDown = async (e: KeyboardEvent) => {
@@ -284,6 +360,51 @@ export default function OralSessionPage() {
   }, []);
 
   /* ================= TAB SWITCH DETECTION ================= */
+
+  useEffect(() => {
+    const handleViolation = async (reason: string) => {
+      // 🔴 Warning message
+      setWarningMessage(`⚠️ ${reason}`);
+      
+      // Force re-enter fullscreen after 500ms
+      setTimeout(async () => {
+        try {
+          if (!document.fullscreenElement) {
+            await document.documentElement.requestFullscreen();
+          }
+        } catch (err) {
+          console.log('Fullscreen re-entry failed:', err);
+        }
+      }, 500);
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        handleViolation('Tab switch detected');
+      }
+    };
+
+    const handleFullscreenChange = async () => {
+      if (!document.fullscreenElement && !allowFullscreenExit) {
+        handleViolation('Fullscreen exited');
+        
+        // Force immediate re-entry
+        try {
+          await document.documentElement.requestFullscreen();
+        } catch (err) {
+          console.log('Fullscreen re-entry failed:', err);
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    };
+  }, [allowFullscreenExit]);
 
   useEffect(() => {
     const handleViolation = async (reason: string) => {

@@ -18,12 +18,25 @@ const facultyOralExamSchema = new mongoose.Schema(
     duration: { type: Number, required: true },
     totalQuestions: { type: Number, required: true },
     questions: [questionSchema],
+    
+    scope: {
+      type: String,
+      enum: ["ALL", "SELECTED", "CLASS"],
+      default: "ALL",
+    },
+    
     assignedStudents: [
       {
         type: mongoose.Schema.Types.ObjectId,
         ref: "User",
       },
     ],
+    
+    assignedClass: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Class",
+    },
+    
     status: {
       type: String,
       enum: ["draft", "assigned"],

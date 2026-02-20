@@ -25,15 +25,25 @@ export default function MaterialUploadPage() {
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([])
   const [selectedStudents, setSelectedStudents] = useState<string[]>([])
   const [students, setStudents] = useState<any[]>([])
-  const [sendType, setSendType] = useState<'ALL' | 'SELECTED'>('ALL')
+  const [sendType, setSendType] = useState<'ALL' | 'SELECTED' | 'CLASS'>('ALL')
+  const [classes, setClasses] = useState<any[]>([])
+  const [selectedClass, setSelectedClass] = useState<string>('')
 
   useEffect(() => {
-  const fetchStudents = async () => {
-    const res = await API.get("/faculty/my-students")
-    setStudents(res.data)
-  }
-  fetchStudents()
-}, [])
+  const fetchData = async () => {
+    try {
+      const [studentsRes, classesRes] = await Promise.all([
+        API.get("/faculty/my-students"),
+        API.get("/faculty/classes")
+      ]);
+      setStudents(studentsRes.data);
+      setClasses(classesRes.data);
+    } catch (err) {
+      console.error("Failed to fetch data:", err);
+    }
+  };
+  fetchData();
+}, []);
 
 
 
@@ -62,6 +72,8 @@ export default function MaterialUploadPage() {
 
   if (sendType === "SELECTED") {
     formData.append("selectedStudents", JSON.stringify(selectedStudents))
+  } else if (sendType === "CLASS") {
+    formData.append("assignedClass", selectedClass)
   }
 
   try {
@@ -198,6 +210,18 @@ export default function MaterialUploadPage() {
                 </div>
                 <span className="text-sm text-gray-700">Select Students</span>
               </label>
+
+              <label className="flex items-center gap-3 cursor-pointer">
+                <div className="relative">
+                  <input
+                    type="radio"
+                    checked={sendType === "CLASS"}
+                    onChange={() => setSendType("CLASS")}
+                    className="w-4 h-4 border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                  />
+                </div>
+                <span className="text-sm text-gray-700">Assign to Class</span>
+              </label>
             </div>
 
             {sendType === "SELECTED" && (
@@ -230,6 +254,24 @@ export default function MaterialUploadPage() {
                     </div>
                   </label>
                 ))}
+              </div>
+            )}
+
+            {sendType === "CLASS" && (
+              <div className="space-y-2 border border-gray-200 p-4 rounded-md bg-white animate-[slideIn_0.2s_ease-out]">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Select Class</label>
+                <select
+                  value={selectedClass}
+                  onChange={(e) => setSelectedClass(e.target.value)}
+                  className="w-full p-2 border rounded"
+                >
+                  <option value="">Select a class</option>
+                  {classes.map((cls) => (
+                    <option key={cls._id} value={cls._id}>
+                      {cls.name} ({cls.students?.length || 0} students)
+                    </option>
+                  ))}
+                </select>
               </div>
             )}
           </Card>

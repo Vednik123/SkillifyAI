@@ -29,6 +29,9 @@ import studentExamRoutes from "./routes/studentExamRoutes.js";
 import facultyQuizReviewRoutes from "./routes/facultyQuizReviewRoutes.js";
 import facultyQuizAnalyticsRoutes from "./routes/facultyQuizAnalyticsRoutes.js";
 
+import classRoutes from "./routes/classRoutes.js";
+import facultyMaterialRoutes from "./routes/facultyMaterialRoutes.js";
+
 
 
 
@@ -82,6 +85,8 @@ app.use("/api/faculty/exams", facultyExamRoutes);
 app.use("/api/student/exams", studentExamRoutes);
 app.use("/api/faculty", facultyQuizReviewRoutes);
 app.use("/api/faculty/analytics", facultyQuizAnalyticsRoutes);
+app.use("/api/faculty/classes", classRoutes);
+app.use("/api/faculty/materials", facultyMaterialRoutes);
 
 
 app.use("/api/interviews", interviewRoutes);

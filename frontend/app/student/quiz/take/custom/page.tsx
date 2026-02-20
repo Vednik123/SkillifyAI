@@ -189,10 +189,22 @@ export default function QuizTakePage() {
 
   /* ---------- FULLSCREEN ON START ---------- */
 
-  // useEffect(() => {
-  //   if (!attemptId) return
-  //   document.documentElement.requestFullscreen?.()
-  // }, [attemptId])
+  useEffect(() => {
+    if (!attemptId) return
+    
+    // Auto-enter fullscreen when exam starts
+    const enterFullscreen = async () => {
+      try {
+        if (!document.fullscreenElement) {
+            await document.documentElement.requestFullscreen();
+        }
+      } catch (error) {
+        console.log('Fullscreen failed:', error);
+      }
+    };
+    
+    enterFullscreen();
+  }, [attemptId])
 
   /* ---------- ESC / FULLSCREEN EXIT ---------- */
 useEffect(() => {
@@ -206,7 +218,9 @@ useEffect(() => {
     ) {
       restoringFullscreenRef.current = true
 
-      // 🔴 warning
+      // 🔴 ESC warning
+      incrementWarning('ESC pressed - Fullscreen exited')
+      
       const res = await fetch(
         'http://localhost:5000/api/quiz/attempt/warning',
         {
@@ -217,29 +231,28 @@ useEffect(() => {
           },
           body: JSON.stringify({
             attemptId,
-            type: 'TAB', // ESC = TAB
+            type: 'ESC',
             answers: answersRef.current,
           }),
         }
       )
 
       const data = await res.json()
-
-      incrementWarning('Fullscreen exit detected (ESC pressed)')
-
       if (data?.autoSubmitted) {
         submit('PROCTOR_VIOLATION')
         return
       }
 
-      // 🔒 restore fullscreen ONLY HERE
-      setTimeout(() => {
-        document.documentElement
-          .requestFullscreen()
-          .catch(() => {})
-          .finally(() => {
-            restoringFullscreenRef.current = false
-          })
+      // 🔒 Force re-enter fullscreen after 500ms
+      setTimeout(async () => {
+        try {
+          if (!document.fullscreenElement) {
+            await document.documentElement.requestFullscreen();
+          }
+          restoringFullscreenRef.current = false
+        } catch (error) {
+          console.log('Re-entry failed:', error);
+        }
       }, 500)
     }
   }
@@ -248,53 +261,92 @@ useEffect(() => {
   return () =>
     document.removeEventListener('fullscreenchange', onFullscreenChange)
 }, [attemptId])
-  /* ---------- TAB SWITCH ---------- */
+  /* ---------- ALT+TAB PREVENTION ---------- */
 
- useEffect(() => {
-  if (!attemptId) return
+  useEffect(() => {
+    if (!attemptId) return
 
-  const onVisibility = async () => {
-    if (document.hidden && !isSubmittingRef.current) {
-      const res = await fetch(
-        'http://localhost:5000/api/quiz/attempt/warning',
-        {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            attemptId,
-            type: 'TAB',
-            answers: answersRef.current,
-          }),
-        }
-      )
-
-      const data = await res.json()
-
-      incrementWarning('Tab switching detected')
-
-      if (data?.autoSubmitted) {
-        submit('PROCTOR_VIOLATION')
-        return
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Block Alt+Tab
+      if (e.altKey && e.key === 'Tab') {
+        e.preventDefault()
+        e.stopPropagation()
+        
+        // Show warning but don't allow tab switch
+        incrementWarning('Alt+Tab blocked - Tab switching not allowed')
+        
+        // Force re-enter fullscreen
+        setTimeout(async () => {
+          try {
+            if (!document.fullscreenElement) {
+              await document.documentElement.requestFullscreen();
+            }
+          } catch (error) {
+            console.log('Re-entry failed:', error);
+          }
+        }, 100)
+        
+        return false
       }
-
-      // 🔒 restore fullscreen
-      // setTimeout(() => {
-      //   document.documentElement.requestFullscreen?.().catch(() => {})
-      // }, 300)
     }
-  }
 
-  document.addEventListener('visibilitychange', onVisibility)
-  return () =>
-    document.removeEventListener('visibilitychange', onVisibility)
-}, [attemptId])
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [attemptId])
+
+  useEffect(() => {
+    if (!attemptId) return
+
+    const onVisibility = async () => {
+      if (document.hidden && !isSubmittingRef.current) {
+        // 🔴 Tab switching warning
+        incrementWarning('Tab switching detected')
+        
+        const res = await fetch(
+          'http://localhost:5000/api/quiz/attempt/warning',
+          {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              attemptId,
+              type: 'TAB',
+              answers: answersRef.current,
+            }),
+          }
+        )
+
+        const data = await res.json()
+        if (data?.autoSubmitted) {
+          submit('PROCTOR_VIOLATION')
+          return
+        }
+
+        // 🔒 Force re-enter fullscreen after 500ms
+        setTimeout(async () => {
+          try {
+            if (!document.fullscreenElement) {
+              await document.documentElement.requestFullscreen();
+            }
+          } catch (error) {
+            console.log('Re-entry failed:', error);
+          }
+        }, 500)
+      }
+    }
+
+    document.addEventListener('visibilitychange', onVisibility)
+    return () =>
+      document.removeEventListener('visibilitychange', onVisibility)
+  }, [attemptId])
 
   /* ---------- ANSWERS ---------- */
 
-  const hasEnteredFullscreenRef = useRef(false)
+const hasEnteredFullscreenRef = useRef(false)
 
 const updateAnswer = (idx: number) => {
   // ✅ Fullscreen on first interaction
