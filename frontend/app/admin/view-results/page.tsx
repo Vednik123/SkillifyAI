@@ -7,12 +7,16 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import Link from 'next/link'
 import { Eye, AlertCircle, BookOpen } from 'lucide-react'
+import jsPDF from 'jspdf'
+import autoTable from 'jspdf-autotable'
 
 export default function ViewResultsPage() {
   const [semesters, setSemesters] = useState<any[]>([])
   const [selectedSemester, setSelectedSemester] = useState('')
   const [searchId, setSearchId] = useState('')
   const [results, setResults] = useState<any>({ examAttempts: [], quizAttempts: [] })
+  const [modalOpen, setModalOpen] = useState(false)
+  const [modalData, setModalData] = useState<any | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [hasSearched, setHasSearched] = useState(false)
@@ -56,6 +60,145 @@ export default function ViewResultsPage() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const openAdminMarksheet = (studentId: string) => {
+    if (!studentId) return alert('Student id not provided')
+    // gather attempts for this student
+    const examAttempts = (results.examAttempts || []).filter((ea: any) => String(ea.student?._id) === String(studentId))
+    const rows = examAttempts.map((ea: any) => {
+      const total = ea.totalQuestions || (ea.exam && ea.exam.totalQuestions) || 0
+      const score = typeof ea.score === 'number' ? ea.score : 0
+      const percentage = total > 0 ? Number(((score / total) * 100).toFixed(2)) : 0
+      return {
+        examId: ea.exam?._id,
+        title: ea.exam?.title || 'Exam',
+        subject: ea.exam?.subject || 'General',
+        score,
+        total,
+        percentage,
+      }
+    })
+
+    const totalObtained = rows.reduce((s: number, r: any) => s + r.score, 0)
+    const totalPossible = rows.reduce((s: number, r: any) => s + r.total, 0)
+    const overallPercentage = totalPossible > 0 ? Number(((totalObtained / totalPossible) * 100).toFixed(2)) : 0
+
+    const studentName = (examAttempts[0] && examAttempts[0].student && examAttempts[0].student.fullName) || 'Student'
+    // Get the actual studentId from the student object, not the MongoDB _id
+    const actualStudentId = (examAttempts[0] && examAttempts[0].student && examAttempts[0].student.studentId) || 'N/A'
+    const semesterName = (semesters.find((s) => s._id === selectedSemester) || {}).name || ''
+
+    setModalData({ rows, totalObtained, totalPossible, overallPercentage, studentName, semesterName, studentId: actualStudentId })
+    setModalOpen(true)
+  }
+
+  const downloadPdf = (data: any) => {
+    const doc: any = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' })
+    const pageWidth = doc.internal.pageSize.getWidth()
+    const margin = 40
+    let currentY = 30
+
+    // Header Section
+    doc.setFontSize(20)
+    doc.setTextColor(20, 20, 80)
+    doc.text('MARKSHEET', pageWidth / 2, currentY, { align: 'center' })
+    currentY += 25
+
+    // Divider
+    doc.setDrawColor(200, 200, 200)
+    doc.line(margin, currentY, pageWidth - margin, currentY)
+    currentY += 15
+
+    // Student Details
+    doc.setFontSize(11)
+    doc.setTextColor(40, 40, 40)
+    const detailsRowHeight = 18
+    doc.text(`Student Name:`, margin, currentY)
+    doc.setFont(undefined, 'bold')
+    doc.text(`${data.studentName}`, margin + 140, currentY)
+    currentY += detailsRowHeight
+
+    doc.setFont(undefined, 'normal')
+    doc.text(`Student ID:`, margin, currentY)
+    doc.setFont(undefined, 'bold')
+    doc.text(`${data.studentId || 'N/A'}`, margin + 140, currentY)
+    currentY += detailsRowHeight
+
+    doc.setFont(undefined, 'normal')
+    doc.text(`Semester:`, margin, currentY)
+    doc.setFont(undefined, 'bold')
+    doc.text(`${data.semesterName}`, margin + 140, currentY)
+    currentY += 20
+
+    // Divider
+    doc.setDrawColor(200, 200, 200)
+    doc.line(margin, currentY, pageWidth - margin, currentY)
+    currentY += 15
+
+    const head = [['Subject', 'Exam', 'Score', 'Total', 'Percentage']]
+    const body = data.rows.map((r: any) => [r.subject, r.title, String(r.score), String(r.total), String(r.percentage + '%')])
+
+    autoTable(doc, { 
+      startY: currentY, 
+      head, 
+      body,
+      margin: { left: margin, right: margin },
+      headStyles: {
+        fillColor: [30, 30, 100],
+        textColor: [255, 255, 255],
+        fontStyle: 'bold',
+        fontSize: 11,
+        halign: 'center',
+        padding: 10
+      },
+      bodyStyles: {
+        fontSize: 10,
+        textColor: [40, 40, 40],
+        padding: 8
+      },
+      alternateRowStyles: {
+        fillColor: [245, 245, 250]
+      }
+    })
+
+    const finalY = (doc as any).lastAutoTable ? (doc as any).lastAutoTable.finalY + 25 : currentY + 150
+
+    // Summary Section
+    doc.setDrawColor(200, 200, 200)
+    doc.line(margin, finalY - 5, pageWidth - margin, finalY - 5)
+
+    doc.setFontSize(11)
+    doc.setTextColor(40, 40, 40)
+    const summaryStart = finalY + 10
+    doc.text(`Total Marks Obtained:`, margin, summaryStart)
+    doc.setFont(undefined, 'bold')
+    doc.setTextColor(34, 139, 34)
+    doc.setFontSize(12)
+    doc.text(`${data.totalObtained}`, pageWidth - margin - 80, summaryStart)
+
+    doc.setFont(undefined, 'normal')
+    doc.setTextColor(40, 40, 40)
+    doc.setFontSize(11)
+    doc.text(`Total Marks Possible:`, margin, summaryStart + 20)
+    doc.setFont(undefined, 'bold')
+    doc.setTextColor(30, 30, 100)
+    doc.setFontSize(12)
+    doc.text(`${data.totalPossible}`, pageWidth - margin - 80, summaryStart + 20)
+
+    // Overall Percentage - Highlighted
+    doc.setDrawColor(100, 180, 100)
+    doc.setFillColor(245, 255, 250)
+    doc.rect(margin, summaryStart + 40, pageWidth - 2 * margin, 30, 'F')
+    doc.setDrawColor(34, 139, 34)
+    doc.rect(margin, summaryStart + 40, pageWidth - 2 * margin, 30)
+
+    doc.setFont(undefined, 'bold')
+    doc.setTextColor(34, 139, 34)
+    doc.setFontSize(14)
+    doc.text(`Overall Percentage: ${data.overallPercentage}%`, pageWidth / 2, summaryStart + 58, { align: 'center' })
+
+    doc.save(`Marksheet_${data.studentId || 'student'}_${data.semesterName || selectedSemester}.pdf`)
   }
 
   const filteredExamAttempts = (results.examAttempts || []).filter(
@@ -180,11 +323,9 @@ export default function ViewResultsPage() {
                           </div>
                         </div>
                       </div>
-                      <Link href={`/student/quiz/scheduled/results/${attempt._id}`}>
-                        <Button variant="outline" size="sm" className="min-w-fit">
-                          View Details
-                        </Button>
-                      </Link>
+                      <Button onClick={() => openAdminMarksheet(attempt.student?._id)} variant="outline" size="sm" className="min-w-fit">
+                        View Details
+                      </Button>
                     </div>
                   </div>
                 ))}
@@ -269,6 +410,55 @@ export default function ViewResultsPage() {
               {searchId && <p className="text-sm text-muted-foreground mt-2">Try a different student ID</p>}
             </Card>
           )}
+        </div>
+      )}
+
+      {/* Marksheet Modal */}
+      {modalOpen && modalData && (
+        <div className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 p-4 overflow-auto">
+          <Card className="w-full max-w-3xl p-6">
+            <div className="flex items-start justify-between">
+              <div>
+                <h3 className="text-lg font-semibold">Marksheet - {modalData.studentName}</h3>
+                <p className="text-sm text-muted-foreground">Semester: {modalData.semesterName}</p>
+              </div>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={() => setModalOpen(false)}>Close</Button>
+                <Button onClick={() => downloadPdf(modalData)} className="bg-primary">Download PDF</Button>
+              </div>
+            </div>
+
+            <div className="mt-4">
+              <table className="w-full table-auto border-collapse">
+                <thead>
+                  <tr className="text-left">
+                    <th className="p-2">Subject</th>
+                    <th className="p-2">Exam</th>
+                    <th className="p-2">Score</th>
+                    <th className="p-2">Total</th>
+                    <th className="p-2">Percentage</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {modalData.rows.map((r: any, i: number) => (
+                    <tr key={i} className="border-t">
+                      <td className="p-2 text-sm">{r.subject}</td>
+                      <td className="p-2 text-sm">{r.title}</td>
+                      <td className="p-2 text-sm font-semibold">{r.score}</td>
+                      <td className="p-2 text-sm">{r.total}</td>
+                      <td className="p-2 text-sm">{r.percentage}%</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+
+              <div className="mt-4 text-right">
+                <div className="text-sm text-muted-foreground">Total Obtained: {modalData.totalObtained}</div>
+                <div className="text-sm text-muted-foreground">Total Possible: {modalData.totalPossible}</div>
+                <div className="text-lg font-bold">Overall: {modalData.overallPercentage}%</div>
+              </div>
+            </div>
+          </Card>
         </div>
       )}
 

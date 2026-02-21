@@ -23,7 +23,10 @@ export const createSemester = async (req, res) => {
 /* List all semesters (admin) */
 export const listSemesters = async (req, res) => {
   try {
-    const list = await Semester.find().sort({ createdAt: -1 }).lean();
+    const list = await Semester.find()
+      .sort({ createdAt: -1 })
+      .populate('faculty', 'fullName facultyId email')
+      .lean();
     return res.json(list);
   } catch (err) {
     console.error(err);
@@ -113,18 +116,39 @@ export const getSemesterResults = async (req, res) => {
     const ExamAttempt = await import("../models/ExamAttempt.js").then((m) => m.default);
     const QuizAttempt = await import("../models/QuizAttempt.js").then((m) => m.default);
 
-    const examAttempts = await ExamAttempt.find({ exam: { $in: examIds } })
+    // populate exam details (title, subject, scheduledAt) for filtering and display
+    const examAttemptsRaw = await ExamAttempt.find({ exam: { $in: examIds } })
       .populate("student", "fullName studentId")
-      .populate("exam", "title")
+      .populate("exam", "title subject scheduledAt totalQuestions")
       .lean();
 
-    const quizAttempts = await QuizAttempt.find({
+    // filter out attempts where the exam has no scheduledAt (invalid/placeholder)
+    let examAttemptsFiltered = examAttemptsRaw.filter((ea) => ea.exam && ea.exam.scheduledAt);
+
+    // deduplicate attempts by exam + student: keep the latest submittedAt (or createdAt)
+    const dedupMap = new Map();
+    for (const ea of examAttemptsFiltered) {
+      const key = `${String(ea.exam._id)}_${String(ea.student?._id || ea.student)}`;
+      const existing = dedupMap.get(key);
+      const time = ea.submittedAt ? new Date(ea.submittedAt).getTime() : new Date(ea.createdAt || 0).getTime();
+      if (!existing) {
+        dedupMap.set(key, { attempt: ea, time });
+      } else if (time > existing.time) {
+        dedupMap.set(key, { attempt: ea, time });
+      }
+    }
+    const examAttempts = Array.from(dedupMap.values()).map(v => v.attempt);
+
+    const quizAttemptsRaw = await QuizAttempt.find({
       quizType: "SCHEDULED",
       quizId: { $in: examIds.map((id) => String(id)) },
       isFinalized: true,
     })
       .populate("student", "fullName studentId")
       .lean();
+
+    // filter quiz attempts with a valid submittedAt
+    const quizAttempts = quizAttemptsRaw.filter((qa) => qa.submittedAt || qa.createdAt);
 
     return res.json({ examAttempts, quizAttempts });
   } catch (err) {

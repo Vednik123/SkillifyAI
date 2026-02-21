@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { BarChart3, Users } from 'lucide-react'
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 
 export default function AdminDashboard() {
   const [semesters, setSemesters] = useState<any[]>([])
@@ -11,6 +12,7 @@ export default function AdminDashboard() {
   const [faculties, setFaculties] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [metrics, setMetrics] = useState({ examCount: 0, attemptCount: 0 })
 
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : ''
 
@@ -38,12 +40,21 @@ export default function AdminDashboard() {
     setLoading(true)
     setError('')
     try {
+      // use semester list (populated) for faculty details
+      const sem = semesters.find((s) => s._id === id)
+      setFaculties(sem?.faculty || [])
+
+      // also fetch results to compute simple metrics
       const res = await fetch(`http://localhost:5000/api/admin/semesters/${id}/results`, {
         headers: { Authorization: `Bearer ${token}` },
       })
-      if (!res.ok) throw new Error('Failed to fetch')
-      const data = await res.json()
-      setFaculties(data.faculty || [])
+      if (res.ok) {
+        const data = await res.json()
+        setMetrics({
+          examCount: (data.examAttempts || []).length ? new Set((data.examAttempts || []).map((e:any)=>String(e.exam?._id))).size : 0,
+          attemptCount: (data.examAttempts || []).length + (data.quizAttempts || []).length,
+        })
+      }
     } catch (err) {
       setError('Failed to fetch semester details')
       setFaculties([])
@@ -130,6 +141,35 @@ export default function AdminDashboard() {
             <p className="text-muted-foreground">No faculties assigned to this semester yet</p>
           </div>
         )}
+
+        {/* simple metrics and small chart */}
+        <div className="mt-6">
+          <div className="flex gap-4">
+            <div className="p-4 bg-white rounded border flex-1">
+              <div className="text-sm text-muted-foreground">Faculties</div>
+              <div className="text-2xl font-bold">{faculties.length}</div>
+            </div>
+            <div className="p-4 bg-white rounded border flex-1">
+              <div className="text-sm text-muted-foreground">Exams</div>
+              <div className="text-2xl font-bold">{metrics.examCount}</div>
+            </div>
+            <div className="p-4 bg-white rounded border flex-1">
+              <div className="text-sm text-muted-foreground">Attempts</div>
+              <div className="text-2xl font-bold">{metrics.attemptCount}</div>
+            </div>
+          </div>
+
+          <div className="mt-4 h-36 bg-white border rounded p-2">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={[{ name: 'Exams', value: metrics.examCount }, { name: 'Attempts', value: metrics.attemptCount }]}> 
+                <XAxis dataKey="name" />
+                <YAxis />
+                <Tooltip />
+                <Bar dataKey="value" fill="#7c3aed" />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
       </div>
     </Card>
   )

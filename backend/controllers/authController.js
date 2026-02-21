@@ -100,9 +100,11 @@ export const loginUser = async (req, res) => {
       token: generateToken(user._id),
       user: {
         id: user._id,
+        _id: user._id,
         fullName: user.fullName,
         email: user.email,
-        role: user.role
+        role: user.role,
+        studentId: user.studentId || null
       }
     });
 

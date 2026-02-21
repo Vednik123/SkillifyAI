@@ -67,13 +67,18 @@ export const assignExamToSemester = async (req, res) => {
     const exam = await Exam.findById(examId);
     if (!exam) return res.status(404).json({ message: "Exam not found" });
 
-    // attach semester and optionally class
+    // If assigning to a semester, require a class selection
+    if (semesterId && !assignedClass) {
+      return res.status(400).json({ message: 'assignedClass is required when assigning an exam to a semester' });
+    }
+
+    // attach semester and class
     exam.semester = semesterId || null;
     if (assignedClass) {
       exam.assignedClass = assignedClass;
       exam.scope = 'CLASS';
     } else {
-      // default to ALL for semester-wide distribution
+      // if no class provided, default to ALL
       exam.scope = 'ALL';
       exam.assignedClass = null;
     }

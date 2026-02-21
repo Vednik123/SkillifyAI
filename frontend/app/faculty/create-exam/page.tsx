@@ -672,6 +672,8 @@ const handleAssignStudents = async () => {
                     if (res.ok) {
                       const data = await res.json()
                       setFacultySemesters(Array.isArray(data) ? data : [])
+                      // ensure classes are loaded for the modal
+                      await fetchClasses()
                       setShowAssignSemester(true)
                     } else {
                       alert('Failed to load semesters')
@@ -847,13 +849,13 @@ const handleAssignStudents = async () => {
       </div>
 
       <div className="space-y-2">
-        <Label>Class (optional)</Label>
+        <Label>Class (required when assigning to a semester)</Label>
         <select
           value={selectedClass}
           onChange={(e) => setSelectedClass(e.target.value)}
           className="w-full border p-2 rounded"
         >
-          <option value="">No class</option>
+          <option value="">Select a class</option>
           {classes.map((c) => (
             <option key={c._id} value={c._id}>{c.name}</option>
           ))}
@@ -864,11 +866,13 @@ const handleAssignStudents = async () => {
         <Button variant="outline" onClick={() => setShowAssignSemester(false)}>Cancel</Button>
         <Button onClick={async () => {
           if (!examId || !selectedSemester) return alert('Select semester')
+          // require class when assigning to semester
+          if (!selectedClass) return alert('Please select a class when assigning to a semester')
           try {
             const res = await fetch(`http://localhost:5000/api/faculty/exams/${examId}/assign-to-semester`, {
               method: 'PATCH',
               headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('token')}` },
-              body: JSON.stringify({ semesterId: selectedSemester, assignedClass: selectedClass || null })
+              body: JSON.stringify({ semesterId: selectedSemester, assignedClass: selectedClass })
             })
             if (!res.ok) throw new Error('Assign failed')
             alert('Assigned to semester')

@@ -117,19 +117,56 @@ router.get(
 
       const ExamAttempt = await import('../models/ExamAttempt.js').then(m=>m.default);
       const QuizAttempt = await import('../models/QuizAttempt.js').then(m=>m.default);
-      const exams = await Exam.find({ semester: semesterId }).select('_id title');
+      const exams = await Exam.find({ semester: semesterId }).select('_id title subject totalQuestions scheduledAt');
       const examIds = exams.map(e=>e._id);
 
       const studentId = req.user._id;
 
-      const examAttempts = await ExamAttempt.find({ exam: { $in: examIds }, student: studentId })
-        .populate('exam', 'title')
+      const examAttemptsRaw = await ExamAttempt.find({ exam: { $in: examIds }, student: studentId })
+        .populate('exam', 'title subject totalQuestions scheduledAt')
         .lean();
 
-      const quizAttempts = await QuizAttempt.find({ quizType: 'SCHEDULED', quizId: { $in: examIds.map(id=>String(id)) }, student: studentId, isFinalized: true })
+      // filter out attempts for exams without valid scheduledAt
+      const examAttemptsFiltered = examAttemptsRaw.filter(ea => ea.exam && ea.exam.scheduledAt);
+
+      // DEDUPLICATE: Keep only latest attempt per exam
+      const examMap = new Map();
+      examAttemptsFiltered.forEach(attempt => {
+        const examId = String(attempt.exam._id);
+        const existing = examMap.get(examId);
+        if (!existing || new Date(attempt.submittedAt) > new Date(existing.submittedAt)) {
+          examMap.set(examId, attempt);
+        }
+      });
+      const examAttempts = Array.from(examMap.values());
+
+      const quizAttemptsRaw = await QuizAttempt.find({ quizType: 'SCHEDULED', quizId: { $in: examIds.map(id=>String(id)) }, student: studentId, isFinalized: true })
         .lean();
 
-      return res.json({ examAttempts, quizAttempts });
+      const quizAttempts = quizAttemptsRaw.filter(qa => qa.submittedAt || qa.createdAt);
+
+      // Build aggregated summary for the semester marksheet
+      const examsSummary = examAttempts.map(ea => {
+        const total = ea.totalQuestions || (ea.exam && ea.exam.totalQuestions) || 0;
+        const score = typeof ea.score === 'number' ? ea.score : 0;
+        const percentage = total > 0 ? (score / total) * 100 : 0;
+        return {
+          examId: ea.exam ? String(ea.exam._id) : null,
+          title: ea.exam ? ea.exam.title : 'Unknown',
+          subject: ea.exam ? ea.exam.subject : 'Unknown',
+          score,
+          total,
+          percentage: Number(percentage.toFixed(2)),
+          startedAt: ea.startedAt || ea.createdAt || null,
+          submittedAt: ea.submittedAt || null,
+        };
+      });
+
+      const totalObtained = examsSummary.reduce((s, e) => s + e.score, 0);
+      const totalPossible = examsSummary.reduce((s, e) => s + e.total, 0);
+      const overallPercentage = totalPossible > 0 ? Number(((totalObtained / totalPossible) * 100).toFixed(2)) : 0;
+
+      return res.json({ examAttempts, quizAttempts, examsSummary, totalObtained, totalPossible, overallPercentage });
     } catch (err) {
       console.error(err);
       return res.status(500).json({ message: 'Failed to fetch marksheet' });
