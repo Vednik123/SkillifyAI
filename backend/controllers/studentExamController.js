@@ -18,7 +18,7 @@ export const getScheduledExamsForStudent = async (req, res) => {
 
     const classIds = studentClasses.map(cls => cls._id);
 
-    const exams = await Exam.find({
+    const query = {
       status: "SCHEDULED",
       $or: [
         { scope: "ALL" },
@@ -31,7 +31,14 @@ export const getScheduledExamsForStudent = async (req, res) => {
           assignedClass: { $in: classIds },
         },
       ],
-    }).populate("faculty", "fullName email");
+    };
+
+    // optional semester filter
+    if (req.query?.semester) {
+      query.semester = req.query.semester;
+    }
+
+    const exams = await Exam.find(query).populate("faculty", "fullName email");
 
     console.log(`Found ${exams.length} scheduled exams for student ${studentId}`);
     console.log("Student class IDs:", classIds);

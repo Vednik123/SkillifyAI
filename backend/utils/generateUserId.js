@@ -10,6 +10,7 @@ export const generateRoleId = (role) => {
   if (role === "student") return `STU-${unique6Digit}`;
   if (role === "faculty") return `FAC-${unique6Digit}`;
   if (role === "parent") return `PAR-${unique6Digit}`;
+  if (role === "admin") return `ADM-${unique6Digit}`;
 
   throw new Error("Invalid role");
 };

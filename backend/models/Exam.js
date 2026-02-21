@@ -49,6 +49,11 @@ const examSchema = new mongoose.Schema({
     ref: "Class",
   },
 
+  semester: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Semester",
+  },
+
   scheduledAt: Date,
 }, { timestamps: true });
 

@@ -39,7 +39,10 @@ export default function LoginPage() {
           break;
         case "parent":
           router.push("/parent/dashboard");
-          break;  
+          break;
+        case "admin":
+          router.push("/admin");
+          break;
       }
     } catch (error: any) {
       alert(error.response?.data?.message || "Login failed");

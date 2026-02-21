@@ -41,6 +41,9 @@ const [students, setStudents] = useState<any[]>([])
 const [selectedStudents, setSelectedStudents] = useState<string[]>([])
 const [classes, setClasses] = useState<any[]>([])
 const [selectedClass, setSelectedClass] = useState<string>('')
+const [showAssignSemester, setShowAssignSemester] = useState(false)
+const [facultySemesters, setFacultySemesters] = useState<any[]>([])
+const [selectedSemester, setSelectedSemester] = useState<string>('')
 
   // Sample generated questions
   // const sampleQuestions = [
@@ -648,7 +651,39 @@ const handleAssignStudents = async () => {
     >
       Schedule Exam
     </Button>
+              <Button
+                onClick={() => {
+                  setShowAssign(true)
+                  fetchStudents()
+                  fetchClasses()
+                }}
+                className="flex-1 bg-purple-600"
+              >
+                Assign Students
+              </Button>
 
+              <Button
+                onClick={async () => {
+                  // fetch semesters assigned to this faculty
+                  try {
+                    const res = await fetch('http://localhost:5000/api/admin/semesters/for-faculty', {
+                      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+                    })
+                    if (res.ok) {
+                      const data = await res.json()
+                      setFacultySemesters(Array.isArray(data) ? data : [])
+                      setShowAssignSemester(true)
+                    } else {
+                      alert('Failed to load semesters')
+                    }
+                  } catch (err) {
+                    alert('Failed to load semesters')
+                  }
+                }}
+                className="flex-1 bg-amber-600"
+              >
+                Assign to Semester
+              </Button>
     <Button
       onClick={() => {
         setShowAssign(true)
@@ -787,6 +822,61 @@ const handleAssignStudents = async () => {
         <Button onClick={handleAssignStudents}>
           Confirm Assign
         </Button>
+      </div>
+    </Card>
+  </div>
+)}
+
+{showAssignSemester && (
+  <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+    <Card className="w-full max-w-lg p-6 space-y-4">
+      <h2 className="text-lg font-bold">Assign to Semester</h2>
+
+      <div className="space-y-2">
+        <Label>Semester</Label>
+        <select
+          value={selectedSemester}
+          onChange={(e) => setSelectedSemester(e.target.value)}
+          className="w-full border p-2 rounded"
+        >
+          <option value="">Select semester</option>
+          {facultySemesters.map((s) => (
+            <option key={s._id} value={s._id}>{s.name}</option>
+          ))}
+        </select>
+      </div>
+
+      <div className="space-y-2">
+        <Label>Class (optional)</Label>
+        <select
+          value={selectedClass}
+          onChange={(e) => setSelectedClass(e.target.value)}
+          className="w-full border p-2 rounded"
+        >
+          <option value="">No class</option>
+          {classes.map((c) => (
+            <option key={c._id} value={c._id}>{c.name}</option>
+          ))}
+        </select>
+      </div>
+
+      <div className="flex justify-end gap-3 pt-4">
+        <Button variant="outline" onClick={() => setShowAssignSemester(false)}>Cancel</Button>
+        <Button onClick={async () => {
+          if (!examId || !selectedSemester) return alert('Select semester')
+          try {
+            const res = await fetch(`http://localhost:5000/api/faculty/exams/${examId}/assign-to-semester`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('token')}` },
+              body: JSON.stringify({ semesterId: selectedSemester, assignedClass: selectedClass || null })
+            })
+            if (!res.ok) throw new Error('Assign failed')
+            alert('Assigned to semester')
+            setShowAssignSemester(false)
+          } catch (err) {
+            alert('Failed to assign to semester')
+          }
+        }}>Assign</Button>
       </div>
     </Card>
   </div>

@@ -1,4 +1,5 @@
 import QuizAttempt from "../models/QuizAttempt.js";
+import Exam from "../models/Exam.js";
 
 export const getQuizResult = async (req, res) => {
   try {
@@ -59,5 +60,59 @@ if (!attempt || !attempt.isFinalized) {
     });
   } catch (err) {
     res.status(500).json({ message: err.message });
+  }
+};
+
+export const listStudentQuizAttempts = async (req, res) => {
+  try {
+    const studentId = req.user._id;
+
+    const attempts = await QuizAttempt.find({
+      student: studentId,
+      isFinalized: true,
+    })
+      .sort({ submittedAt: -1, createdAt: -1 })
+      .lean();
+
+    // collect scheduled quiz ids to resolve titles
+    const scheduledIds = Array.from(
+      new Set(
+        attempts
+          .filter((a) => a.quizType === "SCHEDULED" && a.quizId)
+          .map((a) => a.quizId.toString())
+      )
+    );
+
+    let examMap = {};
+    if (scheduledIds.length) {
+      const exams = await Exam.find({ _id: { $in: scheduledIds } }).select(
+        "_id title"
+      );
+      examMap = exams.reduce((acc, ex) => {
+        acc[ex._id.toString()] = ex.title;
+        return acc;
+      }, {});
+    }
+
+    const list = attempts.map((a) => ({
+      attemptId: a._id,
+      quizType: a.quizType,
+      quizId: a.quizId || null,
+      quizTitle:
+        a.quizType === "SCHEDULED" && a.quizId
+          ? examMap[a.quizId.toString()] || null
+          : a.quizType === "CUSTOM"
+          ? "Custom AI Quiz"
+          : null,
+      score: a.score || 0,
+      totalQuestions: a.totalQuestions || 0,
+      submittedAt: a.submittedAt || a.updatedAt || a.createdAt,
+      status: a.status || "",
+    }));
+
+    return res.json(list);
+  } catch (err) {
+    console.error("Failed to list quiz attempts:", err);
+    return res.status(500).json({ message: "Failed to list attempts" });
   }
 };

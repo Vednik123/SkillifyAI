@@ -11,7 +11,7 @@ import {
   scheduleExam,
 } from "../controllers/facultyExamController.js";
 
-import { assignStudentsToExam } from "../controllers/examAssignmentController.js";
+import { assignStudentsToExam, assignExamToSemester } from "../controllers/examAssignmentController.js";
 
 const router = express.Router();
 
@@ -67,6 +67,15 @@ router.patch(
   "/:examId/assign",
   protect,
   assignStudentsToExam
+);
+
+// 8️⃣ Assign approved exam to a semester (and optional class)
+router.patch(
+  "/:examId/assign-to-semester",
+  protect,
+  // only faculty should assign their exams to semesters
+  // authorizeRoles left out intentionally if faculty only route checks elsewhere
+  assignExamToSemester
 );
 
 export default router;

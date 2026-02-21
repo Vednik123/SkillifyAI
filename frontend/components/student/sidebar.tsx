@@ -31,6 +31,16 @@ const menuItems = [
     href: '/student/quiz',
   },
   {
+    label: 'Exams',
+    icon: BookOpen,
+    href: '/student/exams',
+  },
+  {
+    label: 'MarkSheets',
+    icon: GraduationCap,
+    href: '/student/marksheets',
+  },
+  {
     label: 'Oral Practice',
     icon: Mic2,
     href: '/student/oral',

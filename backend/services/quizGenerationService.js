@@ -113,7 +113,7 @@ Rules:
   for (let attempt = 1; attempt <= MAX_GEMINI_RETRIES; attempt++) {
     try {
       const res = await geminiQuizClient.post(
-        `/gemini-2.0-flash:generateContent?key=${process.env.GEMINI_QUIZ_API_KEY}`,
+        `/gemini-2.5-flash:generateContent?key=${process.env.GEMINI_QUIZ_API_KEY}`,
         {
           contents: [{ parts: [{ text: prompt }] }],
           generationConfig: {

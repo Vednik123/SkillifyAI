@@ -5,6 +5,7 @@ import { useState, Suspense } from 'react'
 import { StudentRegister } from '@/components/auth/student-register'
 import { FacultyRegister } from '@/components/auth/faculty-register'
 import { ParentRegister } from '@/components/auth/parent-register'
+import { AdminRegister } from '@/components/auth/admin-register'
 
 function RegisterContent() {
   const searchParams = useSearchParams()
@@ -18,6 +19,8 @@ function RegisterContent() {
         return <FacultyRegister />
       case 'parent':
         return <ParentRegister />
+      case 'admin':
+        return <AdminRegister />
       default:
         return <StudentRegister />
     }

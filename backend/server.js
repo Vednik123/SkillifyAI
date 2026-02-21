@@ -36,6 +36,7 @@ import facultyQuizAnalyticsRoutes from "./routes/facultyQuizAnalyticsRoutes.js";
 
 import classRoutes from "./routes/classRoutes.js";
 import facultyMaterialRoutes from "./routes/facultyMaterialRoutes.js";
+import semesterRoutes from "./routes/semesterRoutes.js";
 
 
 
@@ -126,7 +127,7 @@ app.use("/api/student", studentRoutes);
 app.use("/api/faculty", facultyRoutes);
 app.use("/api/parent", parentRoutes);
 app.use("/api", aiRoutes);
-app.use("api/faculty/exams", examAssignmentRoutes);
+app.use("/api", examAssignmentRoutes);
 
 app.use("/api/courses", courseRoutes);
 app.use("/api/ai-mentor", aiMentorRoutes);
@@ -143,6 +144,7 @@ app.use("/api/faculty", facultyQuizReviewRoutes);
 app.use("/api/faculty/analytics", facultyQuizAnalyticsRoutes);
 app.use("/api/faculty/classes", classRoutes);
 app.use("/api/faculty/materials", facultyMaterialRoutes);
+app.use("/api/admin/semesters", semesterRoutes);
 
 
 app.use("/api/interviews", interviewRoutes);

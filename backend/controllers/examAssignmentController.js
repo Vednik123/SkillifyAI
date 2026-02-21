@@ -58,3 +58,30 @@ export const assignStudentsToExam = async (req, res) => {
     res.status(500).json({ message: "Assignment failed" });
   }
 };
+
+export const assignExamToSemester = async (req, res) => {
+  try {
+    const { examId } = req.params;
+    const { semesterId, assignedClass } = req.body;
+
+    const exam = await Exam.findById(examId);
+    if (!exam) return res.status(404).json({ message: "Exam not found" });
+
+    // attach semester and optionally class
+    exam.semester = semesterId || null;
+    if (assignedClass) {
+      exam.assignedClass = assignedClass;
+      exam.scope = 'CLASS';
+    } else {
+      // default to ALL for semester-wide distribution
+      exam.scope = 'ALL';
+      exam.assignedClass = null;
+    }
+    await exam.save();
+
+    return res.json({ success: true, examId: exam._id });
+  } catch (err) {
+    console.error("Assign to semester failed:", err);
+    return res.status(500).json({ message: "Failed to assign exam to semester" });
+  }
+};

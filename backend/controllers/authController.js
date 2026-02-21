@@ -26,7 +26,7 @@ export const registerUser = async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
 
     // 🔹 Generate Role ID
-    const roleId = await generateRoleId(role);
+    const roleId = generateRoleId(role);
 
     const userData = {
       fullName,
@@ -49,6 +49,10 @@ export const registerUser = async (req, res) => {
 
     if (role === "parent") {
       userData.parentId = roleId;
+    }
+
+    if (role === "admin") {
+      // Admin doesn't need a specific ID field
     }
 
     const user = await User.create(userData);

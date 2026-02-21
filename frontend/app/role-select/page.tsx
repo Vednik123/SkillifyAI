@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { BookOpen, Users, User, Sparkles } from 'lucide-react'
+import { BookOpen, Users, User, Shield, Sparkles } from 'lucide-react'
 
 export default function RoleSelectPage() {
   const router = useRouter()
@@ -31,6 +31,13 @@ export default function RoleSelectPage() {
       icon: User,
       href: '/register?role=parent',
     },
+    {
+      id: 'admin',
+      title: 'Admin',
+      description: 'Manage semesters, assign faculties, and declare results',
+      icon: Shield,
+      href: '/register?role=admin',
+    },
   ]
 
   return (
@@ -49,7 +56,7 @@ export default function RoleSelectPage() {
         </div>
 
         {/* Role Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8">
           {roles.map((role) => {
             const Icon = role.icon
             return (

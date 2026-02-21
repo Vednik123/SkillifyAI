@@ -8,6 +8,7 @@ import { Calendar, Clock, Plus, Play } from 'lucide-react'
 
 export default function QuizPage() {
   const [scheduledQuizzes, setScheduledQuizzes] = useState<any[]>([])
+  const [pastAttempts, setPastAttempts] = useState<any[]>([])
 
   useEffect(() => {
     fetch('http://localhost:5000/api/student/exams/scheduled', {
@@ -18,6 +19,14 @@ export default function QuizPage() {
       .then((res) => res.json())
       .then((data) => setScheduledQuizzes(data))
       .catch(console.error)
+
+    // fetch past quiz attempts for this student
+    fetch('http://localhost:5000/api/quiz/result/list', {
+      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+    })
+      .then((res) => res.json())
+      .then((data) => setPastAttempts(Array.isArray(data) ? data : []))
+      .catch(() => setPastAttempts([]))
   }, [])
 
   return (
@@ -133,6 +142,38 @@ export default function QuizPage() {
           <Card className="p-10 text-center text-muted-foreground">
             No scheduled exams available
           </Card>
+        )}
+      </section>
+
+      {/* Previous Attempts */}
+      <section className="space-y-6">
+        <h2 className="text-2xl font-semibold">Previous Quiz Reports</h2>
+
+        {pastAttempts.length > 0 ? (
+          pastAttempts.map((item: any) => (
+            <Link
+              key={item.attemptId}
+              href={`/student/quiz/results?attemptId=${item.attemptId}`}
+            >
+              <Card className="p-4 hover:shadow-lg cursor-pointer flex justify-between items-center">
+                <div>
+                  <h3 className="font-semibold">
+                    {item.quizTitle || (item.quizType === 'CUSTOM' ? 'Custom AI Quiz' : 'Scheduled Exam')}
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    {new Date(item.submittedAt).toLocaleString()} • {item.totalQuestions} Qs
+                  </p>
+                </div>
+
+                <div className="text-right">
+                  <div className="font-semibold">{item.score}%</div>
+                  <div className="text-sm text-muted-foreground">{item.status}</div>
+                </div>
+              </Card>
+            </Link>
+          ))
+        ) : (
+          <Card className="p-6 text-center text-muted-foreground">No previous quiz reports</Card>
         )}
       </section>
     </div>

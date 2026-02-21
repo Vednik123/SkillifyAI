@@ -8,7 +8,7 @@ const router = express.Router();
 router.post(
   "/exams/:examId/assign",
   protect,
-  authorizeRoles("FACULTY"),
+  authorizeRoles("faculty"),
   assignStudentsToExam
 );
 
