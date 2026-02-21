@@ -27,6 +27,8 @@ export default function LoginPage() {
       const data = await loginUser(email, password);
 
       localStorage.setItem("token", data.token);
+      localStorage.setItem("userRole", data.user.role);
+      localStorage.setItem("user", JSON.stringify(data.user));
 
       switch (data.user.role) {
         case "student":

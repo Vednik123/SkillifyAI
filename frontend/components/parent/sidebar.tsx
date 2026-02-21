@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useRouter, usePathname } from 'next/navigation'
-import { BarChart3, BookOpen, Bell, User, LogOut, Home, Award, Users } from 'lucide-react'
+import { BarChart3, BookOpen, Bell, User, LogOut, Home, Award, Users, AlertCircle } from 'lucide-react'
 import { UserPlus } from "lucide-react";
 import { Button } from '@/components/ui/button'
 
@@ -25,6 +25,7 @@ export function ParentSidebar() {
     { label: 'Materials', href: '/parent/materials', icon: BookOpen },
     // { label: 'Certifications', href: '/parent/certifications', icon: Award },
     { label: 'Notifications', href: '/parent/notifications', icon: Bell },
+    { label: 'Grievances', href: '/parent/grievances', icon: AlertCircle },
     { label: 'Profile', href: '/parent/profile', icon: User },
     
   ]

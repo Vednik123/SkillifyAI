@@ -8,8 +8,7 @@ import {
 import ExamAttempt from "../models/ExamAttempt.js";
 import Exam from "../models/Exam.js";
 import { getStudentDashboard } from '../controllers/studentController.js'
-
-
+import User from "../models/User.js";
 
 const router = express.Router();
 
@@ -83,6 +82,47 @@ router.get(
   protect,
   authorizeRoles("student"),
   getStudentDashboard
+)
+
+// Get assigned faculty for grievance submission
+router.get(
+  '/assigned-faculty',
+  protect,
+  authorizeRoles("student"),
+  async (req, res) => {
+    try {
+      // Get all faculty members for the grievance dropdown
+      const faculty = await User.find({ role: "faculty" }).select(
+        "_id fullName email department specialization"
+      );
+
+      if (!faculty || faculty.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: "No faculty members available",
+          faculty: []
+        });
+      }
+
+      res.json({
+        success: true,
+        faculty: faculty.map(f => ({
+          _id: f._id,
+          fullName: f.fullName,
+          email: f.email,
+          department: f.department || 'Not specified',
+          specialization: f.specialization || 'Not specified'
+        }))
+      });
+    } catch (error) {
+      console.error("Error fetching assigned faculty:", error);
+      res.status(500).json({
+        success: false,
+        message: "Error fetching faculty members",
+        error: error.message
+      });
+    }
+  }
 )
 
 

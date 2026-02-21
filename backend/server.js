@@ -2,7 +2,11 @@ import express from "express";
 import dotenv from "dotenv";
 import cors from "cors";
 import morgan from "morgan";
+import http from "http";
+import { Server as SocketIOServer } from "socket.io";
 import connectDB from "./config/db.js";
+import { initializeSLAMonitoring } from "./utils/grievanceSLAMonitoring.js";
+import { startGrievanceTimeoutService } from "./utils/grievanceTimeoutService.js";
 import authRoutes from "./routes/authRoutes.js";
 import studentRoutes from "./routes/studentRoutes.js";
 import facultyRoutes from "./routes/facultyRoutes.js";
@@ -18,6 +22,7 @@ import facultyOralRoutes from "./routes/facultyOralRoutes.js";
 import facultyOralStudentRoutes from "./routes/facultyOralStudentRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
 import facultyAnalyticsRoutes from "./routes/facultyAnalyticsRoutes.js";
+import grievanceRoutes from "./routes/grievanceRoutes.js";
 
 import examAssignmentRoutes from "./routes/examAssignmentRoutes.js";
 import proctorRoutes from "./routes/proctorRoutes.js";
@@ -38,7 +43,58 @@ import facultyMaterialRoutes from "./routes/facultyMaterialRoutes.js";
 dotenv.config();
 connectDB();
 
+// Initialize Grievance SLA Monitoring
+initializeSLAMonitoring();
+
 const app = express();
+const httpServer = http.createServer(app);
+
+// ✅ Socket.io Setup
+const io = new SocketIOServer(httpServer, {
+  cors: {
+    origin: process.env.CLIENT_URL,
+    methods: ["GET", "POST"],
+    credentials: true,
+  },
+  transports: ["websocket", "polling"],
+});
+
+// Make io available globally for controllers
+global.io = io;
+
+// Socket.io Connection Handling
+io.on("connection", (socket) => {
+  console.log(`New client connected: ${socket.id}`);
+
+  // Join room based on user role and ID
+  socket.on("join_room", (data) => {
+    const { userId, role } = data;
+    const room = `${role}_${userId}`;
+    socket.join(room);
+    console.log(`${socket.id} joined room: ${room}`);
+  });
+
+  // Real-time notifications for grievance updates
+  socket.on("grievance_update", (data) => {
+    const { recipientId, role, event, payload } = data;
+    const room = `${role}_${recipientId}`;
+    io.to(room).emit("grievance_notification", {
+      event,
+      payload,
+      timestamp: new Date(),
+    });
+  });
+
+  // Handle disconnection
+  socket.on("disconnect", () => {
+    console.log(`Client disconnected: ${socket.id}`);
+  });
+
+  // Handle errors
+  socket.on("error", (error) => {
+    console.log(`Socket error: ${error}`);
+  });
+});
 
 // ✅ Middleware
 app.use(express.json({ limit: "2mb" }));
@@ -95,11 +151,24 @@ app.use("/api/faculty/oral", facultyOralRoutes);
 app.use("/api/student/faculty-oral", facultyOralStudentRoutes);
 app.use("/api/user", userRoutes);
 app.use("/api/faculty/analytics", facultyAnalyticsRoutes);
+app.use("/api/grievance", grievanceRoutes);
 
 
+// Handle unhandled promise rejections
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', reason, 'promise:', promise);
+});
+
+// Handle uncaught exceptions
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught Exception:', error);
+  // Don't exit the process, just log the error
+});
 
 // ✅ Server start
 const PORT = process.env.PORT;
-app.listen(PORT, () => {
+httpServer.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`🔌 Socket.io enabled for real-time communication`);
+  console.log(`⚠️ Error handling enabled - server will not crash on errors`);
 });

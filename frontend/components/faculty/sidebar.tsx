@@ -13,6 +13,7 @@ import {
   User,
   LogOut,
   Sparkles,
+  AlertCircle,
 } from 'lucide-react'
 import { UserPlus } from "lucide-react";
 
@@ -48,6 +49,11 @@ const menuItems = [
     label: 'Review',
     icon: CheckCircle,
     href: '/faculty/review',
+  },
+  {
+    label: 'Grievances',
+    icon: AlertCircle,
+    href: '/faculty/grievances',
   },
   {
     label: 'Profile',

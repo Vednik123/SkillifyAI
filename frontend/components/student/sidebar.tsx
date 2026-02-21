@@ -16,6 +16,7 @@ import {
   Sparkles,
   GraduationCap,
   MessageCircle,
+  AlertCircle,
 } from 'lucide-react'
 
 const menuItems = [
@@ -63,6 +64,11 @@ const menuItems = [
     label: 'AI Mentor',
     icon: MessageCircle,
     href: '/student/ai-mentor',
+  },
+  {
+    label: 'Grievances',
+    icon: AlertCircle,
+    href: '/student/grievances',
   },
   {
     label: 'Profile',

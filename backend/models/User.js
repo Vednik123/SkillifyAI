@@ -31,6 +31,17 @@ const userSchema = new mongoose.Schema(
       required: true,
     },
 
+    // 🔹 FACULTY-SPECIFIC FIELDS
+    department: {
+      type: String,
+      required: false, // Make optional for existing faculty
+    },
+
+    specialization: {
+      type: String,
+      required: false, // Make optional for existing faculty
+    },
+
     // 🔹 ROLE-BASED UNIQUE IDS
     studentId: {
       type: String,
