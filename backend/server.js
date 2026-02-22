@@ -46,7 +46,10 @@ dotenv.config();
 connectDB();
 
 // Initialize services
-initializeSLAMonitoring();
+if (process.env.RENDER === "true") {
+  initializeSLAMonitoring();
+  startGrievanceTimeoutService();
+}
 
 const app = express();
 const httpServer = http.createServer(app);
@@ -54,7 +57,7 @@ const httpServer = http.createServer(app);
 // ✅ Socket.io Setup
 const io = new SocketIOServer(httpServer, {
   cors: {
-    origin: process.env.CLIENT_URL,
+    origin: process.env.CLIENT_URL  || "*",
     methods: ["GET", "POST"],
     credentials: true,
   },
@@ -169,7 +172,7 @@ process.on('uncaughtException', (error) => {
 });
 
 // ✅ Server start
-const PORT = process.env.PORT;
+const PORT = process.env.PORT || 5000;
 httpServer.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`🔌 Socket.io enabled for real-time communication`);
