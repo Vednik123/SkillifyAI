@@ -23,6 +23,7 @@ import facultyOralStudentRoutes from "./routes/facultyOralStudentRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
 import facultyAnalyticsRoutes from "./routes/facultyAnalyticsRoutes.js";
 import grievanceRoutes from "./routes/grievanceRoutes.js";
+import verificationRoutes from "./routes/verificationRoutes.js";
 
 import examAssignmentRoutes from "./routes/examAssignmentRoutes.js";
 import proctorRoutes from "./routes/proctorRoutes.js";
@@ -44,7 +45,7 @@ import semesterRoutes from "./routes/semesterRoutes.js";
 dotenv.config();
 connectDB();
 
-// Initialize Grievance SLA Monitoring
+// Initialize services
 initializeSLAMonitoring();
 
 const app = express();
@@ -100,7 +101,6 @@ io.on("connection", (socket) => {
 // ✅ Middleware
 app.use(express.json({ limit: "2mb" }));
 
-
 app.use(cors({
   origin: process.env.CLIENT_URL,
   credentials: true,
@@ -154,6 +154,7 @@ app.use("/api/student/faculty-oral", facultyOralStudentRoutes);
 app.use("/api/user", userRoutes);
 app.use("/api/faculty/analytics", facultyAnalyticsRoutes);
 app.use("/api/grievance", grievanceRoutes);
+app.use("/api/verify", verificationRoutes);
 
 
 // Handle unhandled promise rejections

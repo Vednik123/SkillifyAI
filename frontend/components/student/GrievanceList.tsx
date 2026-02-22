@@ -54,6 +54,7 @@ export default function StudentGrievanceList() {
   const [grievances, setGrievances] = useState<Grievance[]>([]);
   const [selectedGrievance, setSelectedGrievance] = useState<Grievance | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [showVerificationPopup, setShowVerificationPopup] = useState(false);
   const [verificationGrievanceId, setVerificationGrievanceId] = useState("");
   const [showChatPopup, setShowChatPopup] = useState(false);
@@ -63,7 +64,7 @@ export default function StudentGrievanceList() {
   const [showResolutionPopup, setShowResolutionPopup] = useState(false);
   const [resolutionGrievanceId, setResolutionGrievanceId] = useState("");
 
-  // Initialize socket connection
+  // Initialize socket connection and fetch grievances on mount
   useEffect(() => {
     const user = JSON.parse(localStorage.getItem('user') || '{}');
     if (user._id) {
@@ -95,19 +96,33 @@ export default function StudentGrievanceList() {
         socket.disconnect();
       };
     }
-    
+  }, []);
+
+  // Fetch grievances on mount
+  useEffect(() => {
     fetchGrievances();
+  }, []);
+
+  // Fetch chat messages when selected grievance changes
+  useEffect(() => {
+    if (selectedGrievance) {
+      fetchChatMessages();
+    }
   }, [selectedGrievance]);
 
   const fetchGrievances = async () => {
     try {
       setLoading(true);
-      const response = await API.get(
-        "/grievance/student/list"
-      );
-      setGrievances(response.data.grievances);
-    } catch (err) {
-      console.error("Error fetching grievances:", err);
+      setError(null);
+      console.log("🔄 Fetching grievances...");
+      const response = await API.get("/grievance/student/list");
+      console.log("✅ Grievances fetched:", response.data);
+      setGrievances(response.data.grievances || []);
+    } catch (err: any) {
+      console.error("❌ Error fetching grievances:", err);
+      const errorMsg = err?.response?.data?.message || err?.message || "Failed to load grievances";
+      setError(errorMsg);
+      setGrievances([]);
     } finally {
       setLoading(false);
     }
@@ -267,9 +282,22 @@ export default function StudentGrievanceList() {
         {/* GRIEVANCES LIST */}
         <div className="lg:col-span-1 bg-white rounded-lg shadow-md p-4">
           <h2 className="text-xl font-semibold mb-4 text-gray-800">Grievance List</h2>
-          {grievances.length === 0 ? (
+          
+          {loading && (
+            <p className="text-center text-gray-500 py-8">Loading grievances...</p>
+          )}
+          
+          {error && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
+              <p className="text-sm text-red-700">⚠️ {error}</p>
+            </div>
+          )}
+          
+          {!loading && grievances.length === 0 && !error && (
             <p className="text-gray-500">No grievances submitted yet</p>
-          ) : (
+          )}
+          
+          {!loading && grievances.length > 0 && (
             <div className="space-y-2">
               {grievances.map((grievance) => (
                 <div

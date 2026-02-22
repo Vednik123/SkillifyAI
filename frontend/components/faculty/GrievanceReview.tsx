@@ -37,11 +37,12 @@ export default function FacultyGrievanceReview() {
   const [grievances, setGrievances] = useState<Grievance[]>([]);
   const [selectedGrievance, setSelectedGrievance] = useState<Grievance | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [chatMessage, setChatMessage] = useState("");
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [showFileUpload, setShowFileUpload] = useState(false);
 
-  // Initialize socket connection
+  // Initialize socket connection on mount
   useEffect(() => {
     const user = JSON.parse(localStorage.getItem('user') || '{}');
     if (user._id) {
@@ -55,7 +56,7 @@ export default function FacultyGrievanceReview() {
       // Listen for student messages
       socket.on('student_message', (data: any) => {
         if (selectedGrievance && data.grievanceId === selectedGrievance._id) {
-          fetchChatMessages();
+          fetchChatMessages(selectedGrievance._id);
         }
       });
 
@@ -73,19 +74,33 @@ export default function FacultyGrievanceReview() {
         socket.disconnect();
       };
     }
-    
-    fetchGrievances();
   }, [selectedGrievance]);
+
+  // Fetch grievances on mount
+  useEffect(() => {
+    fetchGrievances();
+  }, []);
+
+  // Fetch chat messages when selected grievance changes
+  useEffect(() => {
+    if (selectedGrievance?._id) {
+      fetchChatMessages(selectedGrievance._id);
+    }
+  }, [selectedGrievance?._id]);
 
   const fetchGrievances = async () => {
     try {
       setLoading(true);
-      const response = await API.get(
-        "/grievance/faculty/list"
-      );
-      setGrievances(response.data.grievances);
-    } catch (err) {
-      console.error("Error fetching grievances:", err);
+      setError(null);
+      console.log("🔄 Fetching faculty grievances...");
+      const response = await API.get("/grievance/faculty/list");
+      console.log("✅ Grievances fetched:", response.data);
+      setGrievances(response.data.grievances || []);
+    } catch (err: any) {
+      console.error("❌ Error fetching grievances:", err);
+      const errorMsg = err?.response?.data?.message || err?.message || "Failed to load grievances";
+      setError(errorMsg);
+      setGrievances([]);
     } finally {
       setLoading(false);
     }
@@ -204,7 +219,7 @@ export default function FacultyGrievanceReview() {
   };
 
   if (loading) {
-    return <div className="text-center py-8">Loading grievances...</div>;
+    return <div className="text-center py-8 text-gray-600">Loading grievances...</div>;
   }
 
   return (
@@ -218,9 +233,17 @@ export default function FacultyGrievanceReview() {
             Assigned Grievances
           </h2>
 
-          {grievances.length === 0 ? (
+          {error && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
+              <p className="text-sm text-red-700">⚠️ {error}</p>
+            </div>
+          )}
+
+          {!error && grievances.length === 0 && (
             <p className="text-gray-500">No grievances assigned</p>
-          ) : (
+          )}
+
+          {!error && grievances.length > 0 && (
             <div className="space-y-2">
               {grievances.map((grievance) => (
                 <div

@@ -1,5 +1,6 @@
 import Exam from "../models/Exam.js";
 import ExamAttempt from "../models/ExamAttempt.js";
+import { recordResultHash } from "../services/hashVerificationService.js";
 
 console.log("studentExamController loaded");
 
@@ -185,18 +186,51 @@ export const submitScheduledExam = async (req, res) => {
       ? "AUTO_SUBMITTED"
       : "SUBMITTED";
     attempt.proctoring = {
-  faceWarnings: proctoring?.faceWarnings || 0,
-  escWarnings: proctoring?.escWarnings || 0,
-  autoSubmitted: proctoring?.autoSubmitted || false,
-  reasons: proctoring?.reasons || [],
-}
+      faceWarnings: proctoring?.faceWarnings || 0,
+      escWarnings: proctoring?.escWarnings || 0,
+      autoSubmitted: proctoring?.autoSubmitted || false,
+      reasons: proctoring?.reasons || [],
+    }
 
     await attempt.save();
 
-    return res.json({
-      score,
-      total: attempt.totalQuestions,
-    });
+    // � HASH VERIFICATION: Record result hash for tamper detection
+    try {
+      console.log("\n📝 Recording result hash for integrity verification...");
+      
+      const hashResult = await recordResultHash(attempt._id, {
+        exam: attempt.exam._id,
+        student: attempt.student,
+        score: score,
+        totalMarks: attempt.totalQuestions,
+        answers: attempt.answers,
+        metadata: {
+          examTitle: attempt.exam.title,
+          subject: attempt.exam.subject,
+          autoSubmitted: proctoring?.autoSubmitted || false,
+        },
+      });
+
+      console.log("✅ Result hash recorded:", hashResult.currentHash.substring(0, 16) + "...");
+      
+      return res.json({
+        score,
+        total: attempt.totalQuestions,
+        verification: {
+          hash: hashResult.currentHash,
+          message: "Result secured with SHA256 verification ✅",
+        },
+      });
+    } catch (hashError) {
+      console.error("❌ Hash verification error:", hashError.message);
+      console.warn("⚠️  Continuing with exam submission");
+      
+      return res.json({
+        score,
+        total: attempt.totalQuestions,
+        warning: "Exam submitted (hash verification unavailable)",
+      });
+    }
   } catch (error) {
     console.error("❌ Submit exam error:", error);
     return res

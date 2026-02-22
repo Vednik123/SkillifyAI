@@ -193,6 +193,8 @@ export const getStudentGrievances = async (req, res) => {
     const studentId = req.user._id;
     const { status } = req.query;
 
+    console.log(`📋 Fetching grievances for student: ${studentId}`);
+
     let query = { student: studentId };
 
     if (status) {
@@ -202,7 +204,10 @@ export const getStudentGrievances = async (req, res) => {
     const grievances = await Grievance.find(query)
       .populate("assignedFaculty", "fullName email phone department")
       .populate("student", "fullName email")
-      .sort({ "timeline.createdAt": -1 });
+      .lean()
+      .sort({ createdAt: -1 });
+
+    console.log(`✅ Found ${grievances.length} grievances for student ${studentId}`);
 
     res.json({
       message: "Grievances retrieved",
@@ -210,8 +215,12 @@ export const getStudentGrievances = async (req, res) => {
       grievances,
     });
   } catch (error) {
-    console.error("Get Student Grievances Error:", error);
-    res.status(500).json({ message: "Failed to retrieve grievances", error });
+    console.error("❌ Get Student Grievances Error:", error);
+    res.status(500).json({ 
+      message: "Failed to retrieve grievances", 
+      error: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
 };
 
@@ -485,6 +494,8 @@ export const getFacultyGrievances = async (req, res) => {
     const facultyId = req.user._id;
     const { status } = req.query;
 
+    console.log(`📋 Fetching grievances for faculty: ${facultyId}`);
+
     let query = { assignedFaculty: facultyId };
     if (status) {
       query.status = status;
@@ -493,7 +504,10 @@ export const getFacultyGrievances = async (req, res) => {
     const grievances = await Grievance.find(query)
       .populate("student", "fullName email phone")
       .populate("assignedFaculty", "fullName email phone department")
-      .sort({ "timeline.createdAt": -1 });
+      .lean()
+      .sort({ createdAt: -1 });
+
+    console.log(`✅ Found ${grievances.length} grievances for faculty ${facultyId}`);
 
     res.json({
       message: "Faculty grievances retrieved",
@@ -501,8 +515,12 @@ export const getFacultyGrievances = async (req, res) => {
       grievances,
     });
   } catch (error) {
-    console.error("Get Faculty Grievances Error:", error);
-    res.status(500).json({ message: "Failed to retrieve grievances", error });
+    console.error("❌ Get Faculty Grievances Error:", error);
+    res.status(500).json({ 
+      message: "Failed to retrieve grievances", 
+      error: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
 };
 

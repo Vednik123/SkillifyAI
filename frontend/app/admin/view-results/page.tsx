@@ -150,12 +150,10 @@ export default function ViewResultsPage() {
         fontStyle: 'bold',
         fontSize: 11,
         halign: 'center',
-        padding: 10
       },
       bodyStyles: {
         fontSize: 10,
         textColor: [40, 40, 40],
-        padding: 8
       },
       alternateRowStyles: {
         fillColor: [245, 245, 250]

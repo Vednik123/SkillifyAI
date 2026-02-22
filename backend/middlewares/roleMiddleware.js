@@ -8,3 +8,9 @@ export const authorizeRoles = (...roles) => {
     next();
   };
 };
+
+// Alias for backward compatibility
+export const roleMiddleware = authorizeRoles;
+
+// Default export
+export default authorizeRoles;
